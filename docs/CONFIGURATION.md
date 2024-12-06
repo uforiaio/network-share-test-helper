@@ -3,12 +3,22 @@
 ## Environment Setup
 
 ### Environment Variables
-Create a `.env` file based on `env.template` with the following variables:
-```
+Create a `.env` file based on `env.template`:
+```ini
+# Share Configuration
 SHARE_PATH=\\server\share
 USERNAME=your_username
-DEBUG_LEVEL=1
+
+# Debug Settings
+DEBUG_LEVEL=1  # 0=Basic, 1=Standard, 2=Detailed, 3=Full
+
+# API Keys
 OPENAI_KEY=your_openai_key
+
+# Output Settings
+OUTPUT_DIR=output
+LOG_DIR=logs
+TIMESTAMP_FORMAT=ISO8601  # All timestamps use ISO 8601
 ```
 
 ### Platform-Specific Setup
@@ -34,41 +44,36 @@ OPENAI_KEY=your_openai_key
    brew install wireshark
    brew install samba
    ```
-2. Grant packet capture permissions to Wireshark
+2. Grant packet capture permissions
 
 ## Debug Levels
 
-- Level 0: Basic logging (errors and critical info)
-- Level 1: Standard logging (default)
-- Level 2: Detailed logging with packet info
-- Level 3: Full debug output with ML insights
-
-## Network Configuration
-
-### Share Access
-- Ensure proper network share mounting
-- Verify user permissions
-- Test basic connectivity
-
-### Packet Capture
-- Configure network interface
-- Set appropriate capture filters
-- Verify Wireshark/tcpdump access
+- Level 0: Basic (errors and critical info)
+- Level 1: Standard (default, includes performance metrics)
+- Level 2: Detailed (adds packet info and ML insights)
+- Level 3: Full (all available data and analysis)
 
 ## Output Configuration
 
 ### Log Files
 - Located in `logs/` directory
-- ISO 8601 timestamp format
+- All timestamps in ISO 8601 format
+- Automatic log rotation (30 days)
 - Debug level specific content
-- Automatic log rotation
 
 ### Analysis Results
 - Stored in `output/` directory
 - JSON formatted data
+- ISO 8601 timestamps
 - Network metrics
 - Protocol information
 - Performance recommendations
+
+### Network Captures
+- Stored in `output/` directory
+- pcapng format
+- Sanitized sensitive data
+- Timestamped filenames
 
 ## Security Configuration
 
@@ -76,38 +81,45 @@ OPENAI_KEY=your_openai_key
 - Never stored on disk
 - Secure password input
 - Session-only authentication
+- Access pattern monitoring
 
 ### API Keys
 - Store in `.env` file
-- Not included in logs
-- Restricted permissions
+- Not included in logs/captures
+- Restricted file permissions
+- Regular rotation recommended
 
 ## Performance Settings
 
 ### Packet Capture
-- Buffer size configuration
-- Capture duration limits
+- Buffer size: 1MB default
+- Capture duration: Configurable
 - Filter optimization
+- Interface auto-detection
 
 ### Analysis
 - ML model parameters
 - Performance thresholds
 - Alert configurations
+- Resource limits
 
 ## Troubleshooting
 
 ### Common Issues
-1. Share access denied
+1. Share Access Denied
    - Verify credentials
    - Check permissions
-   - Test network connectivity
+   - Test connectivity
+   - Review share path format
 
-2. Packet capture fails
+2. Packet Capture Fails
    - Check administrator/root access
    - Verify interface configuration
-   - Test Wireshark/tcpdump installation
+   - Test Wireshark/tcpdump
+   - Review capture filters
 
-3. Missing manufacturer database
+3. Missing Manufacturer Database
    - Will be downloaded automatically
    - Check internet connectivity
    - Verify write permissions
+   - Temporary warning only

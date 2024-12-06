@@ -1,135 +1,121 @@
 # User Guide
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
+### 1. Installation
 ```bash
+# Clone repository
 git clone https://github.com/yourusername/dfs-nfs-debugger.git
 cd dfs-nfs-debugger
-```
 
-2. Create and activate virtual environment:
-```bash
-# Windows
+# Create and activate virtual environment
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
 
-# Linux/Mac
-python3 -m venv venv
-source venv/bin/activate
-```
-
-3. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
 pip install -e .
 ```
 
-4. Configure environment:
+### 2. Configuration
 ```bash
+# Create environment file
 copy env.template .env  # Windows
 cp env.template .env    # Linux/Mac
-# Edit .env with your settings
+
+# Edit .env with your settings:
+SHARE_PATH=\\server\share
+USERNAME=your_username
+DEBUG_LEVEL=1  # 0=Basic, 1=Standard, 2=Detailed, 3=Full
+OPENAI_KEY=your_openai_key
 ```
 
-## Quick Start
+### 3. Basic Usage
+```bash
+# Run the analyzer
+python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Configure environment:
-   - Copy `env.template` to `.env`
-   - Set your share path, username, and OpenAI key
-
-3. Run the analyzer:
-   ```bash
-   python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>
-   ```
+# Example
+python dfs_nfs_analyzer.py "\\share\info" "domain\user" "INFO" "sk-your-openai-key"
+```
 
 ## Features
 
 ### Network Analysis
 - Share connectivity testing
 - Protocol version detection
-- Performance metrics
+- Performance metrics (ISO 8601 timestamps)
 - Latency measurements
 - Throughput analysis
 
-### Protocol Support
-- SMB/CIFS shares
-- NFS mounts
-- Cross-platform compatibility
+### Share Analysis
+- Share type detection
+- Protocol-specific metrics
+- Backend server identification
+- Permission validation
+- Access pattern analysis
 
 ### Security
-- Secure password input
-- No credential storage
+- Secure credential handling
+- Network traffic sanitization
+- Debug log masking
 - API key protection
-- Sanitized logging
+- Access monitoring
 
 ### Reporting
 - JSON-formatted results
 - ISO 8601 timestamps
 - Performance metrics
 - ML-powered insights
-
-## Usage Examples
-
-### Basic Analysis
-```bash
-python dfs_nfs_analyzer.py \\server\share username 1 sk-your-openai-key
-```
-
-### Debug Mode
-```bash
-python dfs_nfs_analyzer.py \\server\share username 2 sk-your-openai-key
-```
-
-### Full Analysis
-```bash
-python dfs_nfs_analyzer.py \\server\share username 3 sk-your-openai-key
-```
+- Optimization recommendations
 
 ## Output Files
 
-### Logs Directory
-- Debug logs with timestamps
-- Error tracking
-- Performance data
-- System metrics
+### Analysis Results
+```
+output/
+├── analysis_results.json    # Latest analysis (ISO 8601)
+├── capture_*.pcapng        # Network captures
+├── analysis_*.log          # Debug logs (ISO 8601)
+└── README.md              # Output documentation
+```
 
-### Output Directory
-- Analysis results (JSON)
-- Performance reports
-- ML insights
-- Recommendations
+### Log Structure
+```
+logs/
+├── debug_*.log    # Debug logs (ISO 8601)
+├── error_*.log    # Error logs (ISO 8601)
+└── stats_*.log    # Statistics (ISO 8601)
+```
 
-## Troubleshooting
+## Debug Levels
 
-### Common Issues
+### Level 0: Basic
+- Errors and critical info
+- Basic share status
+- Connection status
+- Essential metrics
 
-1. Share Access
-   - Verify credentials
-   - Check permissions
-   - Test connectivity
+### Level 1: Standard
+- Level 0 +
+- Performance metrics
+- Protocol information
+- Basic ML insights
 
-2. Packet Capture
-   - Run as administrator
-   - Check Wireshark/Npcap
-   - Verify interface
+### Level 2: Detailed
+- Level 1 +
+- Packet analysis
+- Full ML insights
+- Trend analysis
+- Optimization suggestions
 
-3. Performance
-   - Check network load
-   - Monitor system resources
-   - Verify share health
-
-### Debug Levels
-
-- Level 0: Errors only
-- Level 1: Standard info
-- Level 2: Detailed debug
-- Level 3: Full analysis
+### Level 3: Full Debug
+- Level 2 +
+- Raw packet data
+- Complete ML analysis
+- Resource metrics
+- System state
 
 ## Best Practices
 
@@ -138,28 +124,68 @@ python dfs_nfs_analyzer.py \\server\share username 3 sk-your-openai-key
 - Baseline comparison
 - Trend analysis
 - Issue tracking
+- Resource monitoring
 
 ### Security
-- Rotate API keys
-- Update regularly
-- Monitor access
-- Review logs
+- Regular API key rotation
+- Network capture sanitization
+- Log file protection
+- Access monitoring
+- Credential management
 
 ### Maintenance
-- Check updates
-- Clean old logs
-- Verify configs
-- Test regularly
+- Regular updates
+- Log rotation
+- Configuration review
+- Performance tuning
+- Database updates
 
-## Updating the Application
+## Troubleshooting
 
-The application checks for updates on startup. You can also update manually:
+### Common Issues
 
+1. Share Access
+   ```
+   Error: Access Denied
+   Solution:
+   - Verify credentials
+   - Check permissions
+   - Test connectivity
+   - Review share path
+   ```
+
+2. Packet Capture
+   ```
+   Error: Capture Failed
+   Solution:
+   - Run as administrator
+   - Check Wireshark/Npcap
+   - Verify interface
+   - Review filters
+   ```
+
+3. Performance
+   ```
+   Issue: Slow Analysis
+   Solution:
+   - Check network load
+   - Monitor resources
+   - Verify share health
+   - Optimize filters
+   ```
+
+## Updating
+
+### Automatic Updates
 ```bash
+# The tool checks for updates on startup
+# Manual check:
 python update.py
 ```
 
-This will:
-- Check for new versions
-- Update dependencies
-- Maintain virtual environment
+### Update Process
+1. Checks version
+2. Downloads updates
+3. Updates dependencies
+4. Preserves configuration
+5. Maintains virtual environment

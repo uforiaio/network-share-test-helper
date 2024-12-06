@@ -2,25 +2,25 @@
 
 A powerful command-line utility for analyzing DFS and NFS shares, combining traditional network analysis with advanced machine learning capabilities for comprehensive debugging and performance optimization.
 
-## Features
+## Key Features
 
 ### Network Analysis
 - 🔍 Analyzes share type (DFS/NFS/SMB)
-- 📊 Captures network traffic in pcap format
+- 📊 Captures network traffic in pcapng format
 - 🔒 Masks sensitive information
-- 📝 Generates detailed debugging logs
+- 📝 Generates detailed debugging logs with ISO 8601 timestamps
 
 ### Performance Monitoring
 - 📈 Network statistics and configuration
 - ⚡ MTU and TCP window optimization
-- 🔄 Traffic pattern analysis
+- 🔄 Traffic pattern analysis with real-time metrics
 - 📉 Resource utilization tracking
 
 ### Machine Learning Capabilities
 - 🤖 OpenAI GPT-4 powered analysis
 - 📊 Anomaly detection with Isolation Forest
-- 🔮 Performance prediction
-- 📈 Trend analysis and forecasting
+- 🔮 Performance prediction and forecasting
+- 📈 Historical trend analysis
 
 ### Security
 - 🔐 Secure configuration storage
@@ -28,57 +28,32 @@ A powerful command-line utility for analyzing DFS and NFS shares, combining trad
 - 🔒 Debug log sanitization
 - ✅ Access pattern monitoring
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
+1. Clone and setup:
 ```bash
 git clone https://github.com/yourusername/dfs-nfs-debugger.git
 cd dfs-nfs-debugger
-```
-
-2. Create and activate virtual environment:
-```bash
-# Windows
 python -m venv venv
-venv\Scripts\activate
-
-# Linux/Mac
-python3 -m venv venv
-source venv/bin/activate
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
 ```
 
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
-```
-
-4. Install the package in development mode:
-```bash
 pip install -e .
 ```
 
-5. Create environment configuration:
+3. Configure environment:
 ```bash
-# Copy the template
-copy env.template .env
+copy env.template .env  # Windows
+cp env.template .env    # Linux/Mac
 # Edit .env with your settings
 ```
 
-6. Ensure you have:
-   - Administrative privileges for network capture
-   - OpenAI API key for ML features
-   - Network access to target shares
-
-## Usage
-
-### Running the Application
-
+4. Run the analyzer:
 ```bash
-# Activate virtual environment first
-venv\Scripts\activate  # Windows
-source venv/bin/activate  # Linux/Mac
-
-# Run the application
 python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>
 ```
 
@@ -87,95 +62,53 @@ Example:
 python dfs_nfs_analyzer.py "\\share\info" "domain\user" "INFO" "sk-your-openai-key"
 ```
 
-### Updating the Application
-
-The application automatically checks for updates on startup. You can also manually check and update:
-
-```bash
-# Activate virtual environment first
-venv\Scripts\activate  # Windows
-source venv/bin/activate  # Linux/Mac
-
-# Run the update script
-python update.py
-```
-
-This will:
-- Check for new versions of the application
-- Update dependencies if needed
-- Maintain virtual environment isolation
-
 ## Output Files
 
-- `output.txt`: Detailed analysis including:
-  - Share and network configuration
-  - Performance metrics
-  - ML insights and predictions
-  - Optimization recommendations
-  
-- `debug_analysis.log`: Debug information with:
-  - Operation logs
-  - Error tracking
-  - Performance metrics
-  - ML analysis results
+### Analysis Results (`output/analysis_results.json`)
+- Share and network configuration
+- Performance metrics with ISO 8601 timestamps
+- ML insights and predictions
+- Optimization recommendations
 
-## Security
+### Debug Logs (`output/analysis_*.log`)
+- Operation logs with ISO 8601 timestamps
+- Error tracking and diagnostics
+- Performance metrics
+- ML analysis results
+
+### Network Captures (`output/capture_*.pcapng`)
+- Raw network traffic data
+- Protocol-specific information
+- Sanitized sensitive data
+- Performance indicators
+
+## Security Features
 
 - Passwords are never stored
-- Network capture masks sensitive data
-- All debug information is sanitized
+- Network captures are sanitized
+- Debug information is masked
 - API keys are securely managed
+- All timestamps use ISO 8601 format
 
 ## Platform Support
 
-This tool was primarily developed and tested on Windows systems. While basic support for Linux and macOS has been added, it should be considered experimental and untested. The following features may have limited functionality on non-Windows systems:
+### Windows (Primary)
+- Full feature support
+- Native share access
+- Wireshark/Npcap integration
+- Administrative tools
 
-- Network share access (different path formats and mounting mechanisms)
-- Packet capture (requires different privileges and setup)
-- Performance measurements (system-specific commands and tools)
+### Linux (Experimental)
+- Basic share analysis
+- Samba/NFS client support
+- tcpdump integration
+- Root privileges required
 
-### Prerequisites by Platform
-
-#### Windows
-- Python 3.8 or higher
-- Wireshark with Npcap
-- Administrative privileges for packet capture
-- Network share access permissions
-
-#### Linux (Experimental)
-- Python 3.8 or higher
-- Wireshark/tshark
-- tcpdump
-- Root privileges for packet capture
-- Samba client for SMB access
-- NFS client for NFS access
-
-#### macOS (Experimental)
-- Python 3.8 or higher
-- Wireshark/tshark
-- tcpdump
-- Root privileges for packet capture
-- Samba client for SMB access
-- NFS client for NFS access
-
-### Platform-Specific Notes
-
-#### Windows
-- Default configuration and full feature support
-- Uses Windows-native share access mechanisms
-- Requires Npcap for packet capture
-
-#### Linux
-- Share paths should use forward slashes
-- May require manual mounting of shares
-- Uses tcpdump for packet capture
-- Some performance metrics may differ from Windows
-
-#### macOS
-- Share paths should use forward slashes
-- May require manual mounting of shares
-- Uses tcpdump for packet capture
-- Some performance metrics may differ from Windows
+### macOS (Experimental)
+- Basic share analysis
+- Samba/NFS client support
+- tcpdump integration
+- Root privileges required
 
 ## Requirements
 
@@ -187,7 +120,7 @@ This tool was primarily developed and tested on Windows systems. While basic sup
 
 ## Documentation
 
-Detailed documentation is available in the `/docs` directory:
+Detailed documentation in `/docs`:
 - [Configuration Guide](docs/CONFIGURATION.md)
 - [User Guide](docs/GUIDE.md)
 - [Context & Background](docs/CONTEXT.md)
@@ -199,26 +132,27 @@ Detailed documentation is available in the `/docs` directory:
 ```
 dfs-nfs-debugger/
 ├── docs/               # Project documentation
-├── logs/              # Application execution logs
-├── output/            # Performance data and analysis
-├── venv/              # Virtual environment
-├── dfs_nfs_analyzer.py # Main application file
+├── output/            # Analysis results and logs
+│   ├── *.json        # Analysis results (ISO 8601)
+│   ├── *.log         # Debug logs (ISO 8601)
+│   └── *.pcapng      # Network captures
+├── logs/              # Application logs
+├── dfs_nfs_analyzer.py # Main analyzer script
 ├── requirements.txt   # Python dependencies
-├── setup.py          # Package setup file
-├── env.template      # Environment variables template
-├── .env              # Environment variables
-├── .gitignore        # Git ignore rules
-└── README.md         # Project overview
+├── setup.py          # Installation script
+└── env.template      # Environment template
 ```
 
 ## Contributing
 
-See [Contributing Guidelines](CONTRIBUTING.md) for details on:
-- Code submission process
-- Documentation standards
-- Testing requirements
-- ML model improvements
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request with:
+   - Description of changes
+   - Test results
+   - Documentation updates
+   - ML model improvements (if applicable)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.

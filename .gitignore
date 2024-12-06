@@ -1,8 +1,3 @@
-# Virtual Environment
-venv/
-env/
-ENV/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -25,40 +20,62 @@ wheels/
 .installed.cfg
 *.egg
 
-# Logs and Output
-logs/*
-!logs/.gitkeep
-!logs/README.md
-output/*
-!output/.gitkeep
-!output/README.md
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 .project
 .pydevproject
 .settings/
 
-# Environment variables
+# Logs and databases
+*.log
+*.sqlite
+*.db
+logs/*
+!logs/README.md
+!logs/.gitkeep
+output/*
+!output/README.md
+!output/.gitkeep
+
+# Network captures
+*.pcap
+*.pcapng
+*.cap
+*.etl
+*.evt
+*.evtx
+
+# Credentials and secrets
 .env
-.env.*
+*.key
+*.pem
+*.cert
+*.p12
+*.pfx
+credentials.json
+token.json
+secrets.yaml
+config.local.yaml
 
 # Test coverage
 .coverage
-htmlcov/
-.tox/
-.nox/
-.coverage.*
-.cache
-nosetests.xml
 coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
+htmlcov/
 .pytest_cache/
+.tox/
 
 # Documentation
 docs/_build/
@@ -68,3 +85,19 @@ docs/_templates/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.bak
+*.backup
+
+# Project specific
+analysis_results/
+debug_output/
+test_data/
+!test_data/samples/
+private/
+local_config/
