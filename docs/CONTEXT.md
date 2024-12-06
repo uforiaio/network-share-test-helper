@@ -1,88 +1,86 @@
-# Context and Background
+# Project Context
+
+## Overview
+The DFS/NFS Debugger is a network analysis tool designed to help diagnose and optimize network share performance. It supports both Windows DFS/SMB and Unix NFS protocols, providing detailed metrics and insights about network share behavior.
 
 ## Purpose
+- Analyze network share performance
+- Detect protocol-specific issues
+- Measure latency and throughput
+- Provide optimization recommendations
+- Generate detailed performance reports
 
-This utility is designed for debugging and analyzing DFS/NFS share connections in enterprise environments. It combines traditional network analysis with advanced machine learning capabilities to provide comprehensive insights into network performance, issues, and optimization opportunities.
+## Key Features
+
+### Network Analysis
+- Real-time packet capture
+- Protocol version detection
+- Performance metrics collection
+- Latency measurements
+- Throughput analysis
+
+### Cross-Platform Support
+- Windows (Primary)
+  - Native SMB/CIFS support
+  - Wireshark/Npcap integration
+  - Administrative tools
+- Linux (Experimental)
+  - Samba client support
+  - tcpdump integration
+  - NFS client tools
+- macOS (Experimental)
+  - Samba client support
+  - tcpdump integration
+  - NFS client tools
+
+### Security Features
+- Secure password handling
+- No credential storage
+- Sanitized logging
+- API key protection
+
+### Machine Learning
+- Performance prediction
+- Anomaly detection
+- Trend analysis
+- Optimization suggestions
+
+## Technical Stack
+
+### Core Technologies
+- Python 3.8+
+- Wireshark/pyshark
+- OpenAI GPT-4 API
+- Pandas/NumPy
+
+### Network Protocols
+- SMB/CIFS
+- NFS
+- TCP/IP analysis
+- Network metrics
+
+### Output Formats
+- JSON data
+- ISO 8601 timestamps
+- Structured logs
+- Performance reports
 
 ## Use Cases
 
-1. **Troubleshooting Connection Issues**
-   - 🔍 Identifying network connectivity problems
-   - 🔑 Analyzing share access permissions
-   - 🌐 Debugging namespace resolution
+### Network Administrators
+- Performance monitoring
+- Issue diagnosis
+- Optimization planning
+- Capacity planning
 
-2. **Performance Analysis**
-   - ⚡ Measuring network latency
-   - 📊 Analyzing TCP window sizes
-   - 🔄 Monitoring MTU settings
+### System Engineers
+- Protocol analysis
+- Performance tuning
+- Security auditing
+- Troubleshooting
 
-3. **Security Auditing**
-   - 🔒 Tracking share access patterns
-   - 🛡️ Monitoring network traffic
-   - ✅ Ensuring secure configurations
-
-4. **Predictive Analytics**
-   - 🔮 Forecasting performance trends
-   - 📈 Detecting anomalies
-   - 🤖 Generating AI-powered recommendations
-   - 📉 Analyzing historical patterns
-
-5. **Optimization Guidance**
-   - 💡 Automated performance suggestions
-   - 🎯 Resource utilization insights
-   - 🔧 Configuration recommendations
-   - 📋 Best practice compliance
-
-## Technology Stack
-
-### Core Components
-- Python-based analysis engine
-- Network packet capture (pyshark)
-- System metrics collection (psutil)
-- Traffic analysis (scapy)
-
-### Machine Learning
-- OpenAI GPT-4 for predictive analysis
-- Isolation Forest for anomaly detection
-- Scikit-learn for pattern recognition
-- Pandas for data processing
-
-### Visualization
-- Orca for data visualization
-- Emoji-based log categorization
-- Structured JSON output
-- Colorized terminal output
-
-## Target Environment
-
-### Platform Support
-- Windows-based systems
-- Enterprise networks with DFS/NFS shares
-- Environments requiring detailed diagnostics
-
-### Network Requirements
-- Administrative access
-- OpenAI API connectivity
-- DFS/NFS share access
-- Packet capture capabilities
-
-### Use Cases
-- Enterprise IT departments
-- Network administrators
-- System engineers
-- Performance analysts
-- Security auditors
-
-## Development Environment
-
-### Virtual Environment
-- Isolated dependencies
-- Reproducible setup
-- Development tools
-- Package management
-
-### Update System
-- Version checking
-- Dependency management
-- Self-update capability
-- Configuration management
+### DevOps Teams
+- Integration testing
+- Performance validation
+- Automated monitoring
+- Deployment verification

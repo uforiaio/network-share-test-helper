@@ -39,112 +39,117 @@ cp env.template .env    # Linux/Mac
    pip install -r requirements.txt
    ```
 
-2. Run the analyzer:
+2. Configure environment:
+   - Copy `env.template` to `.env`
+   - Set your share path, username, and OpenAI key
+
+3. Run the analyzer:
    ```bash
    python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>
    ```
 
+## Features
+
+### Network Analysis
+- Share connectivity testing
+- Protocol version detection
+- Performance metrics
+- Latency measurements
+- Throughput analysis
+
+### Protocol Support
+- SMB/CIFS shares
+- NFS mounts
+- Cross-platform compatibility
+
+### Security
+- Secure password input
+- No credential storage
+- API key protection
+- Sanitized logging
+
+### Reporting
+- JSON-formatted results
+- ISO 8601 timestamps
+- Performance metrics
+- ML-powered insights
+
+## Usage Examples
+
+### Basic Analysis
+```bash
+python dfs_nfs_analyzer.py \\server\share username 1 sk-your-openai-key
+```
+
+### Debug Mode
+```bash
+python dfs_nfs_analyzer.py \\server\share username 2 sk-your-openai-key
+```
+
+### Full Analysis
+```bash
+python dfs_nfs_analyzer.py \\server\share username 3 sk-your-openai-key
+```
+
 ## Output Files
 
-### output.txt
-Contains detailed analysis with emoji-based categorization:
+### Logs Directory
+- Debug logs with timestamps
+- Error tracking
+- Performance data
+- System metrics
 
-#### Share Information
-- 📁 Share type (DFS/NFS)
-- 📁 Path details
-- 📁 Access permissions
+### Output Directory
+- Analysis results (JSON)
+- Performance reports
+- ML insights
+- Recommendations
 
-#### Network Analysis
-- 🌐 Connection details
-- 🌐 Protocol information
-- 🌐 Active ports
+## Troubleshooting
 
-#### Performance Metrics
-- ⚡ TCP window sizes
-- ⚡ MTU settings
-- ⚡ Latency measurements
+### Common Issues
 
-#### Traffic Analysis
-- 🔄 Packet information
-- 🔄 Protocol details
-- 🔄 Masked sensitive data
+1. Share Access
+   - Verify credentials
+   - Check permissions
+   - Test connectivity
 
-#### Security Information
-- 🔒 Authentication method
-- 🔒 Encryption status
-- 🔒 Access patterns
+2. Packet Capture
+   - Run as administrator
+   - Check Wireshark/Npcap
+   - Verify interface
 
-#### ML Insights
-- 📊 Anomaly detection
-- 🔮 Performance predictions
-- 📈 Trend analysis
-- 🤖 AI recommendations
+3. Performance
+   - Check network load
+   - Monitor system resources
+   - Verify share health
 
-### debug_analysis.log
-- ℹ️ General Information
-- ⚠️ Warnings and Errors
-- ✅ Success Messages
-- ⚙️ Configuration Changes
+### Debug Levels
 
-## Interpreting Results
+- Level 0: Errors only
+- Level 1: Standard info
+- Level 2: Detailed debug
+- Level 3: Full analysis
 
-### Log Categories
-Each log entry is prefixed with an emoji indicating its category:
-- 📁 Share Operations
-- 🌐 Network Activity
-- ⚡ Performance Data
-- 🔄 Traffic Monitoring
-- 🔒 Security Events
-- ⚠️ Warnings/Errors
-- ℹ️ Information
-- ✅ Success
-- ⚙️ Configuration
-- 📊 Anomalies
-- 🔮 Predictions
-- 📈 Trends
+## Best Practices
 
-### Machine Learning Insights
+### Performance
+- Regular monitoring
+- Baseline comparison
+- Trend analysis
+- Issue tracking
 
-#### Anomaly Detection
-The analyzer uses Isolation Forest to detect anomalies in:
-- Network latency
-- Packet sizes
-- Window sizes
-- Traffic patterns
+### Security
+- Rotate API keys
+- Update regularly
+- Monitor access
+- Review logs
 
-#### Performance Prediction
-GPT-4 powered analysis provides:
-- Future performance trends
-- Potential bottlenecks
-- Resource utilization forecasts
-- Optimization recommendations
-
-### Troubleshooting Common Issues
-
-1. ⚠️ Connection Failures
-   - Check network connectivity
-   - Verify share permissions
-   - Validate credentials
-
-2. ⚡ Performance Problems
-   - Review TCP window sizes
-   - Check MTU configuration
-   - Analyze network latency
-
-3. 🔒 Permission Errors
-   - Verify user access rights
-   - Check share permissions
-   - Validate authentication
-
-4. 🌐 Network Configuration
-   - Confirm port availability
-   - Check firewall settings
-   - Verify DNS resolution
-
-5. 🤖 ML Analysis Issues
-   - Verify OpenAI API key
-   - Check internet connectivity
-   - Ensure sufficient data points
+### Maintenance
+- Check updates
+- Clean old logs
+- Verify configs
+- Test regularly
 
 ## Updating the Application
 

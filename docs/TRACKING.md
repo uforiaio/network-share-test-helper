@@ -94,13 +94,100 @@
 - [ ] Cross-system correlation
 - [ ] Integration with monitoring systems
 
+## Issue Tracking
+
+### Current Features
+
+### Network Analysis
+- [x] Basic share connectivity testing
+- [x] Protocol version detection
+- [x] Performance metrics collection
+- [x] Latency measurements
+- [x] Throughput analysis
+
+### Security
+- [x] Secure password input
+- [x] No credential storage
+- [x] API key protection
+- [x] Sanitized logging
+
+### Output
+- [x] JSON formatted results
+- [x] ISO 8601 timestamps
+- [x] Debug logs
+- [x] Performance reports
+
+### Cross-Platform
+- [x] Windows support
+- [ ] Linux support (experimental)
+- [ ] macOS support (experimental)
+
 ## Known Issues
 
-1. Requires administrative privileges
-2. Limited to Windows environments
-3. Manual configuration required
-4. Requires internet for ML features
-5. OpenAI API rate limits apply
+### High Priority
+1. Wireshark manufacturer database warning
+   - Status: Fixed
+   - Solution: Auto-download manuf file
+
+2. Package dependencies
+   - Status: Fixed
+   - Solution: Updated requirements.txt
+
+### Medium Priority
+1. Cross-platform path handling
+   - Status: In Progress
+   - Impact: Linux/macOS support
+
+2. Protocol detection accuracy
+   - Status: Under Investigation
+   - Impact: NFS analysis
+
+### Low Priority
+1. Documentation updates
+   - Status: In Progress
+   - Impact: User guidance
+
+2. Code optimization
+   - Status: Planned
+   - Impact: Performance
+
+## Future Enhancements
+
+### Short Term
+1. Improve Linux support
+   - Samba integration
+   - NFS client tools
+   - Path handling
+
+2. Enhanced protocol detection
+   - SMB dialects
+   - NFS versions
+   - Backend hosts
+
+### Long Term
+1. GUI Interface
+   - Real-time monitoring
+   - Interactive graphs
+   - User-friendly controls
+
+2. Advanced Analytics
+   - More ML models
+   - Predictive maintenance
+   - Automated optimization
+
+## Contributing
+
+### Guidelines
+1. Follow coding standards
+2. Add unit tests
+3. Update documentation
+4. Test cross-platform
+
+### Testing
+1. Run unit tests
+2. Verify platform support
+3. Check security features
+4. Validate output format
 
 ## Contributing
 

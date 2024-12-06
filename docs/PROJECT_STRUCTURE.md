@@ -4,121 +4,73 @@
 
 ```
 dfs-nfs-debugger/
-├── docs/               # Project documentation
-│   ├── CONFIGURATION.md
-│   ├── CONTEXT.md
-│   ├── DEPENDENCIES.md
-│   ├── GUIDE.md
-│   ├── PROJECT_STRUCTURE.md
-│   └── TRACKING.md
-│
-├── logs/              # Application execution logs
-│   └── README.md      # Log directory documentation
-│
-├── output/            # Performance data and analysis
-│   └── README.md      # Output directory documentation
-│
-├── venv/              # Virtual environment (not in repo)
-│
-├── dfs_nfs_analyzer.py # Main application file
-├── version_check.py   # Version and dependency management
-├── update.py         # Update script
-├── requirements.txt   # Python dependencies
-├── setup.py          # Package setup file
-├── env.template      # Environment variables template
-├── .env              # Environment variables (not in repo)
-├── .gitignore        # Git ignore rules
-└── README.md         # Project overview
+├── dfs_nfs_analyzer.py     # Main analyzer script
+├── requirements.txt        # Python dependencies
+├── setup.py               # Installation script
+├── env.template           # Environment variables template
+├── README.md             # Project documentation
+├── docs/                 # Detailed documentation
+│   ├── CONFIGURATION.md  # Configuration guide
+│   ├── CONTEXT.md       # Project context
+│   ├── DEPENDENCIES.md  # Dependency information
+│   ├── GUIDE.md        # User guide
+│   ├── PROJECT_STRUCTURE.md  # This file
+│   └── TRACKING.md     # Issue tracking
+├── logs/                # Debug and analysis logs
+└── output/             # Analysis results
 ```
 
-## Code Structure
+## Core Components
 
-### Core Classes
+### Main Script (dfs_nfs_analyzer.py)
+- `ShareAnalyzer`: Main class for share analysis
+- `NetworkMetrics`: Network performance measurements
+- `ProtocolInfo`: Protocol and version information
+- `IssueDetector`: Network issue detection
+- `PerformanceOptimizer`: Performance recommendations
 
-#### ShareAnalyzer
-- Environment management
-- Network analysis
-- Traffic capture
-- Log generation
+### Configuration
+- `.env`: Runtime configuration
+- `env.template`: Configuration template
+- Environment variables for:
+  - Share paths
+  - Credentials
+  - Debug levels
+  - API keys
 
-#### NetworkMetrics
-- RTT statistics
-- Packet size tracking
-- Window size monitoring
+### Output Organization
+- `logs/`: Debug and analysis logs with ISO 8601 timestamps
+- `output/`: Analysis results in JSON format
+  - Network metrics
+  - Protocol information
+  - Performance data
+  - Issue reports
+
+## Key Features
+
+### Network Analysis
+- Packet capture and analysis
+- Protocol version detection
 - Performance metrics
+- Latency measurements
+- Throughput analysis
 
-#### IssueDetector
-- Problem identification
-- Error categorization
-- Threshold monitoring
-- Health checks
+### Protocol Support
+- SMB/CIFS
+- NFS
+- Cross-platform compatibility
+  - Windows (primary)
+  - Linux (experimental)
+  - macOS (experimental)
 
-#### PerformanceOptimizer
-- Configuration analysis
-- Resource optimization
-- Performance tuning
-- Improvement suggestions
+### Security
+- Secure credential handling
+- No password storage
+- Sanitized logging
+- API key management
 
-#### MLAnalyzer
-- Anomaly detection
-- Performance prediction
-- Trend analysis
-- AI-powered insights
-
-### Main Components
-
-1. **Configuration Management**
-   - Environment variables
-   - OpenAI API integration
-   - Network settings
-   - Logging configuration
-
-2. **Share Analysis**
-   - DFS/NFS detection
-   - Permission checking
-   - Namespace analysis
-   - Backend server discovery
-
-3. **Network Monitoring**
-   - Packet capture
-   - Traffic analysis
-   - Performance metrics
-   - Connection tracking
-
-4. **Machine Learning**
-   - Anomaly detection (Isolation Forest)
-   - Predictive analysis (GPT-4)
-   - Pattern recognition
-   - Trend forecasting
-
-5. **Debug Logging**
-   - Emoji-based categorization
-   - Structured output
-   - Error tracking
-   - Performance metrics
-
-6. **Output Generation**
-   - JSON formatting
-   - Emoji indicators
-   - ML insights
-   - Recommendations
-
-## Generated Files
-
-### .env
-- Share path configuration
-- User credentials
-- Debug level settings
-- OpenAI API key
-
-### output.txt
-- Analysis results
-- Performance metrics
-- ML insights
-- Recommendations
-
-### debug_analysis.log
-- Detailed debug information
-- Error tracking
-- Operation timestamps
-- System metrics
+### Reporting
+- JSON-formatted results
+- ISO 8601 timestamps
+- Detailed metrics
+- Performance recommendations
