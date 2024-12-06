@@ -48,6 +48,17 @@
    - Update requirements incrementally
    - Document API changes separately
 
+### Module Organization
+1. **Module Splitting**
+   - Split platform-specific code into dedicated modules
+   - Keep utility functions in separate files
+   - Maximum file size of 500 lines
+
+2. **Memory Management**
+   - Implement cleanup handlers for resources
+   - Use context managers for file operations
+   - Monitor memory usage in long-running operations
+
 ## Best Practices
 
 ### Development Flow
@@ -76,6 +87,17 @@
    - Keep file operations minimal
    - Batch similar changes together
    - Use efficient search patterns
+
+### Performance Guidelines
+1. **Operation Chunking**
+   - Process large datasets in chunks
+   - Implement pagination for large results
+   - Use generators for memory efficiency
+
+2. **Resource Monitoring**
+   - Log resource usage at key points
+   - Set memory thresholds with alerts
+   - Regular garbage collection checks
 
 ## Communication Guidelines
 
