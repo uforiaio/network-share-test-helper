@@ -1,10 +1,10 @@
 """Protocol information collection and analysis."""
 
-import logging
 import json
 from datetime import datetime, timezone
+from ..utils.logging import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 class ProtocolInfo:
     """Collects and analyzes protocol-specific information."""

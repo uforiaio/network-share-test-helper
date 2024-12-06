@@ -1,10 +1,10 @@
 """Issue detection and analysis for network shares."""
 
-import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Any
+from ..utils.logging import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 class IssueDetector:
     """Detects and analyzes network share issues."""

@@ -3,7 +3,6 @@
 import os
 import sys
 import subprocess
-import logging
 import json
 from datetime import datetime, timezone, timedelta
 import getpass
@@ -17,8 +16,9 @@ from ..metrics.protocol_info import ProtocolInfo
 from ..detectors.issue_detector import IssueDetector
 from ..detectors.performance_optimizer import PerformanceOptimizer
 from .ml_analyzer import MLAnalyzer
+from ..utils.logging import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 class ShareAnalyzer:
     """Main class for analyzing network shares."""

@@ -1,14 +1,14 @@
 """ML analysis functionality for DFS/NFS debugging."""
 
-import logging
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 import openai
 from datetime import datetime, timedelta
+from src.utils.logging import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 class MLAnalyzer:
     """Machine Learning analyzer for network metrics."""

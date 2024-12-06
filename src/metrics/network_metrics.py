@@ -2,9 +2,9 @@
 
 import statistics
 from datetime import datetime, timezone
-import logging
+from ..utils.logging import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 class NetworkMetrics:
     """Collects and analyzes network performance metrics."""
