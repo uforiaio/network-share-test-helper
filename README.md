@@ -126,6 +126,57 @@ This will:
 - All debug information is sanitized
 - API keys are securely managed
 
+## Platform Support
+
+This tool was primarily developed and tested on Windows systems. While basic support for Linux and macOS has been added, it should be considered experimental and untested. The following features may have limited functionality on non-Windows systems:
+
+- Network share access (different path formats and mounting mechanisms)
+- Packet capture (requires different privileges and setup)
+- Performance measurements (system-specific commands and tools)
+
+### Prerequisites by Platform
+
+#### Windows
+- Python 3.8 or higher
+- Wireshark with Npcap
+- Administrative privileges for packet capture
+- Network share access permissions
+
+#### Linux (Experimental)
+- Python 3.8 or higher
+- Wireshark/tshark
+- tcpdump
+- Root privileges for packet capture
+- Samba client for SMB access
+- NFS client for NFS access
+
+#### macOS (Experimental)
+- Python 3.8 or higher
+- Wireshark/tshark
+- tcpdump
+- Root privileges for packet capture
+- Samba client for SMB access
+- NFS client for NFS access
+
+### Platform-Specific Notes
+
+#### Windows
+- Default configuration and full feature support
+- Uses Windows-native share access mechanisms
+- Requires Npcap for packet capture
+
+#### Linux
+- Share paths should use forward slashes
+- May require manual mounting of shares
+- Uses tcpdump for packet capture
+- Some performance metrics may differ from Windows
+
+#### macOS
+- Share paths should use forward slashes
+- May require manual mounting of shares
+- Uses tcpdump for packet capture
+- Some performance metrics may differ from Windows
+
 ## Requirements
 
 - Windows operating system

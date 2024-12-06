@@ -4,7 +4,13 @@ import subprocess
 import logging
 import json
 from datetime import datetime
-import pyshark
+try:
+    import pyshark
+    WIRESHARK_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    print("⚠️ Warning: pyshark/Wireshark not available. Some features will be limited.")
+    print("Please install Wireshark from: https://www.wireshark.org/download.html")
+    WIRESHARK_AVAILABLE = False
 from dotenv import load_dotenv
 import socket
 import winreg
@@ -20,7 +26,12 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+import getpass
+import platform
+import time
+import pkg_resources
+import requests
 
 init()  # Initialize colorama
 
@@ -30,7 +41,9 @@ class NetworkMetrics:
         self.packet_sizes = []
         self.retransmissions = 0
         self.window_sizes = []
-        
+        self.packet_loss_count = 0
+        self.total_packets = 0
+
     def add_rtt_sample(self, rtt):
         self.rtt_samples.append(rtt)
         
@@ -43,27 +56,81 @@ class NetworkMetrics:
     def add_window_size(self, size):
         self.window_sizes.append(size)
         
-    def get_statistics(self):
-        if not self.rtt_samples:
-            return {}
+    def measure_latency(self, target_path):
+        """Measure network latency to the target"""
+        try:
+            start_time = time.time()
+            # Use net use to test connection
+            if platform.system() == "Windows":
+                subprocess.run(['net', 'use', target_path], capture_output=True, check=True)
+            end_time = time.time()
+            latency = (end_time - start_time) * 1000  # Convert to milliseconds
+            self.rtt_samples.append(latency)
+            return latency
+        except Exception as e:
+            logging.error(f"Error measuring latency: {str(e)}")
+            return -1
+
+    def measure_throughput(self, target_path):
+        """Measure network throughput to the target"""
+        try:
+            # Create a test file
+            test_size = 1024 * 1024  # 1MB
+            test_file = os.path.join(os.path.dirname(target_path), "throughput_test.tmp")
             
+            # Write test data
+            start_time = time.time()
+            with open(test_file, 'wb') as f:
+                f.write(b'0' * test_size)
+            end_time = time.time()
+            
+            # Clean up
+            try:
+                os.remove(test_file)
+            except:
+                pass
+            
+            # Calculate throughput in bits per second
+            duration = end_time - start_time
+            throughput = (test_size * 8) / duration if duration > 0 else 0
+            return throughput
+        except Exception as e:
+            logging.error(f"Error measuring throughput: {str(e)}")
+            return -1
+
+    def calculate_packet_loss(self):
+        """Calculate packet loss percentage"""
+        if self.total_packets == 0:
+            return 0
+        return (self.packet_loss_count / self.total_packets) * 100 if self.total_packets > 0 else 0
+
+    def update_metrics(self, packet):
+        """Update metrics based on packet information"""
+        self.total_packets += 1
+        
+        # Extract packet size
+        if hasattr(packet, 'length'):
+            self.packet_sizes.append(int(packet.length))
+        
+        # Check for retransmissions (TCP packets)
+        if hasattr(packet, 'tcp'):
+            if hasattr(packet.tcp, 'flags_reset') and packet.tcp.flags_reset == '1':
+                self.retransmissions += 1
+            if hasattr(packet.tcp, 'window_size'):
+                self.window_sizes.append(int(packet.tcp.window_size))
+        
+        # Check for packet loss indicators
+        if hasattr(packet, 'tcp') and hasattr(packet.tcp, 'analysis_retransmission'):
+            self.packet_loss_count += 1
+
+    def get_statistics(self):
+        """Get current network statistics"""
         return {
-            "rtt": {
-                "min": min(self.rtt_samples),
-                "max": max(self.rtt_samples),
-                "avg": sum(self.rtt_samples) / len(self.rtt_samples)
-            },
-            "packet_size": {
-                "min": min(self.packet_sizes) if self.packet_sizes else 0,
-                "max": max(self.packet_sizes) if self.packet_sizes else 0,
-                "avg": sum(self.packet_sizes) / len(self.packet_sizes) if self.packet_sizes else 0
-            },
+            "avg_latency": sum(self.rtt_samples) / len(self.rtt_samples) if self.rtt_samples else 0,
+            "packet_loss_percent": self.calculate_packet_loss(),
             "retransmissions": self.retransmissions,
-            "window_size": {
-                "min": min(self.window_sizes) if self.window_sizes else 0,
-                "max": max(self.window_sizes) if self.window_sizes else 0,
-                "avg": sum(self.window_sizes) / len(self.window_sizes) if self.window_sizes else 0
-            }
+            "avg_window_size": sum(self.window_sizes) / len(self.window_sizes) if self.window_sizes else 0,
+            "avg_packet_size": sum(self.packet_sizes) / len(self.packet_sizes) if self.packet_sizes else 0
         }
 
 class IssueDetector:
@@ -319,7 +386,7 @@ class MLAnalyzer:
         anomalies = []
         for idx in anomaly_indices:
             anomaly = {
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'type': 'anomaly',
                 'metrics': {
                     'rtt': float(df.iloc[idx]['rtt']),
@@ -345,7 +412,7 @@ class MLAnalyzer:
     def _get_current_stats(self, metrics):
         """Get current performance statistics"""
         return {
-            'timestamp': datetime.now(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'avg_rtt': np.mean(metrics.rtt_samples) if metrics.rtt_samples else 0,
             'avg_packet_size': np.mean(metrics.packet_sizes) if metrics.packet_sizes else 0,
             'retransmissions': metrics.retransmissions,
@@ -354,7 +421,7 @@ class MLAnalyzer:
         
     def _filter_recent_data(self, timeframe_minutes):
         """Keep only recent data within timeframe"""
-        cutoff_time = datetime.now() - timedelta(minutes=timeframe_minutes)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=timeframe_minutes)
         return [d for d in self.historical_data if d['timestamp'] > cutoff_time]
         
     def _generate_ai_prediction(self):
@@ -421,64 +488,209 @@ Format the response as a JSON array with 'prediction' and 'recommendations' fiel
         try:
             prediction_data = json.loads(prediction_text)
             return [{
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'type': 'ai_prediction',
                 'prediction': prediction_data.get('prediction', ''),
                 'recommendations': prediction_data.get('recommendations', [])
             }]
         except json.JSONDecodeError:
             return [{
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'type': 'ai_prediction',
                 'prediction': prediction_text,
                 'recommendations': []
             }]
 
-class ShareAnalyzer:
+class ProtocolInfo:
     def __init__(self):
-        self.logger = self._setup_logging()
-        self.output_file = "output.txt"
+        self.protocol_version = None
+        self.backend_hosts = set()
+        self.namespace_info = {}
+        self.negotiated_features = {}
+        self.library_versions = self._get_library_versions()
+
+    def _get_library_versions(self):
+        """Get versions of key libraries in use"""
+        versions = {
+            'python': platform.python_version(),
+            'pyshark': pkg_resources.get_distribution('pyshark').version,
+            'wireshark': self._get_wireshark_version(),
+            'os': platform.system() + ' ' + platform.release()
+        }
+        return versions
+
+    def _get_wireshark_version(self):
+        """Get Wireshark version"""
+        try:
+            if platform.system() == "Windows":
+                result = subprocess.run(['tshark', '--version'], capture_output=True, text=True)
+            else:  # Linux/Mac
+                result = subprocess.run(['tshark', '--version'], capture_output=True, text=True)
+            if result.stdout:
+                version_match = re.search(r'TShark .*?(\d+\.\d+\.\d+)', result.stdout)
+                if version_match:
+                    return version_match.group(1)
+        except Exception as e:
+            logging.warning(f"Could not determine Wireshark version: {e}")
+        return "Unknown"
+
+    def update_from_packet(self, packet):
+        """Update protocol information from packet"""
+        try:
+            # Extract SMB/NFS version information
+            if hasattr(packet, 'smb2'):
+                self.protocol_version = f"SMB {packet.smb2.dialect}"
+                if hasattr(packet.smb2, 'server_component'):
+                    self.backend_hosts.add(packet.smb2.server_component)
+            elif hasattr(packet, 'smb'):
+                self.protocol_version = "SMB1"
+            elif hasattr(packet, 'nfs'):
+                self.protocol_version = f"NFS v{packet.nfs.version}"
+
+            # Extract namespace information
+            if hasattr(packet, 'smb2') and hasattr(packet.smb2, 'tree'):
+                share_path = packet.smb2.tree
+                if share_path not in self.namespace_info:
+                    self.namespace_info[share_path] = {
+                        'first_seen': datetime.now(timezone.utc).isoformat(),
+                        'access_count': 0
+                    }
+                self.namespace_info[share_path]['access_count'] += 1
+
+            # Extract negotiated features
+            if hasattr(packet, 'smb2') and hasattr(packet.smb2, 'capabilities'):
+                self.negotiated_features['capabilities'] = packet.smb2.capabilities
+            if hasattr(packet, 'smb2') and hasattr(packet.smb2, 'security_mode'):
+                self.negotiated_features['security_mode'] = packet.smb2.security_mode
+
+        except Exception as e:
+            logging.error(f"Error updating protocol info: {e}")
+
+    def get_info(self):
+        """Get current protocol information"""
+        return {
+            "protocol_version": self.protocol_version,
+            "backend_hosts": list(self.backend_hosts),
+            "namespace_info": self.namespace_info,
+            "negotiated_features": self.negotiated_features,
+            "library_versions": self.library_versions
+        }
+
+class ShareAnalyzer:
+    def __init__(self, share_path, username, debug_level=0):
+        self.share_path = share_path
+        self.username = username
+        self.debug_level = debug_level
+        self.platform_info = get_platform_info()
+        
+        # Normalize path separators
+        if not self.platform_info['is_windows']:
+            self.share_path = self.share_path.replace('\\', '/')
+        
         self.metrics = NetworkMetrics()
-        self.error_counts = defaultdict(int)
+        self.protocol_info = ProtocolInfo()
         self.issue_detector = IssueDetector()
         self.performance_optimizer = PerformanceOptimizer()
         self.ml_analyzer = None  # Will be initialized after loading API key
+        self.load_env_config()
+        self.logger = self._setup_logging()
+        self.error_counts = defaultdict(int)
+        self.output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+        self.logs_dir = os.path.join(self.output_dir, "logs")
+        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.logs_dir, exist_ok=True)
+        
+        # Set up log files with ISO 8601 timestamp (formatted for valid filenames)
+        timestamp_utc = datetime.now(timezone.utc)
+        filename_timestamp = timestamp_utc.strftime("%Y-%m-%dT%H-%M-%S")
+        
+        self.output_file = os.path.join(self.output_dir, f"analysis_{filename_timestamp}.log")
+        self.debug_log = os.path.join(self.logs_dir, f"debug_analysis_{filename_timestamp}.log")
         
     def _setup_logging(self):
+        """Set up logging with ISO 8601 timestamps"""
         logger = logging.getLogger('ShareAnalyzer')
-        logger.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        logger.setLevel(logging.DEBUG)
         
-        file_handler = logging.FileHandler('debug_analysis.log')
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+        # Remove any existing handlers
+        logger.handlers = []
+        
+        # Create formatter with ISO 8601 timestamps
+        formatter = logging.Formatter(
+            fmt='%(asctime)s.%(msecs)03dZ - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%dT%H:%M:%S'
+        )
+        
+        # File handler for debug log
+        debug_handler = logging.FileHandler(self.debug_log)
+        debug_handler.setLevel(logging.DEBUG)
+        debug_handler.setFormatter(formatter)
+        logger.addHandler(debug_handler)
+        
+        # Console handler for user feedback
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        
+        # Add timezone info to timestamps
+        def custom_time(*args):
+            utc_dt = datetime.now(timezone.utc)
+            return utc_dt.timetuple()
+        
+        logging.Formatter.converter = custom_time
         
         return logger
 
-    def _format_log(self, category, message):
-        emoji_map = {
-            'share': ':file_folder:',
-            'network': ':globe_with_meridians:',
-            'error': ':warning:',
-            'success': ':white_check_mark:',
-            'info': ':information_source:',
-            'traffic': ':arrows_counterclockwise:',
-            'security': ':lock:',
-            'performance': ':zap:',
-            'config': ':gear:',
-            'issue': ':exclamation_mark:',
-            'optimization': ':chart_increasing:',
-            'anomaly': ':chart_decreasing:',
-            'prediction': ':crystal_ball:'
-        }
-        return f"{emoji.emojize(emoji_map.get(category, ':information_source:'))} {message}"
+    def authenticate(self, password):
+        """Authenticate with the share using provided credentials"""
+        self._password = password  # Stored in memory only
+        try:
+            # Attempt to access the share with credentials
+            if self.platform_info['is_windows']:
+                net_use_cmd = f'net use "{self.share_path}" /user:{self.username} "{self._password}"'
+                subprocess.run(net_use_cmd, shell=True, capture_output=True, text=True)
+            return True
+        except Exception as e:
+            self.handle_error("authentication", str(e))
+            return False
 
+    def load_env_config(self):
+        """Load environment configuration from .env file"""
+        load_dotenv()
+        self.openai_key = os.getenv('OPENAI_KEY')
+        
+    def update_env_file(self, share_path, username, debug_level, openai_key):
+        """Update environment configuration without storing sensitive data"""
+        self.share_path = share_path
+        self.username = username
+        self.debug_level = debug_level
+        self.openai_key = openai_key
+        
+        # Write non-sensitive data to .env
+        with open(".env", "w") as f:
+            f.write(f"SHARE_PATH={share_path}\n")
+            f.write(f"USERNAME={username}\n")
+            f.write(f"DEBUG_LEVEL={debug_level}\n")
+            f.write(f"OPENAI_KEY={openai_key}\n")
+            
     def _write_to_output(self, data, category='info'):
-        with open(self.output_file, 'a', encoding='utf-8') as f:
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            formatted_message = self._format_log(category, json.dumps(data, indent=2))
-            f.write(f"{timestamp} {formatted_message}\n")
-
+        """Write formatted output to log file"""
+        timestamp = datetime.now(timezone.utc).isoformat()
+        formatted_data = {
+            'timestamp': timestamp,
+            'category': category,
+            'data': data
+        }
+        
+        with open(self.output_file, 'a') as f:
+            json.dump(formatted_data, f, indent=2)
+            f.write('\n')
+            
+        # Also log to console for important events
+        if category in ['error', 'warning', 'security']:
+            self.logger.info(f"{category.upper()}: {json.dumps(data)}")
+            
     def handle_error(self, error_type, error_message, critical=False):
         """Enhanced error handling with categorization and recovery options"""
         self.error_counts[error_type] += 1
@@ -486,7 +698,7 @@ class ShareAnalyzer:
             "type": error_type,
             "message": error_message,
             "count": self.error_counts[error_type],
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "critical": critical
         }
         
@@ -557,7 +769,7 @@ class ShareAnalyzer:
                     
             # Get routing information using 'route print' on Windows
             try:
-                route_output = subprocess.check_output(['route', 'print'], text=True)
+                route_output = subprocess.check_output(['route', 'print'], capture_output=True, text=True)
                 info["routing_info"]["route_table"] = route_output
             except Exception as e:
                 self.handle_error("routing_info", str(e))
@@ -601,60 +813,63 @@ class ShareAnalyzer:
             else:
                 packet_dict['data'] = packet.highest_layer
                 
+            # Update protocol information
+            self.protocol_info.update_from_packet(packet)
+            
             return packet_dict
         except Exception as e:
             self.handle_error("packet_processing", str(e))
             return {"error": str(e)}
 
     def capture_traffic(self, interface="Ethernet"):
-        capture = pyshark.LiveCapture(interface=interface, display_filter="nfs || smb || smb2")
-        print("Starting packet capture... (Press Ctrl+C to stop)")
+        if not WIRESHARK_AVAILABLE:
+            self.handle_error("wireshark", "Wireshark is not available. Please install it to capture traffic.")
+            return
+        
+        # Set the path to TShark executable
+        os.environ["TSHARK_PATH"] = "C:\\Program Files\\Wireshark\\tshark.exe"
         
         try:
+            self.logger.info(f"Starting packet capture on interface: {interface}")
+            self.logger.info("Capturing DFS/NFS/SMB traffic... Press Ctrl+C to stop")
+            
+            capture = pyshark.LiveCapture(interface=interface, display_filter="nfs || smb || smb2")
+            packet_count = 0
+            start_time = datetime.now()
+            
             for packet in capture.sniff_continuously(packet_count=100):
+                packet_count += 1
                 # Process packet and mask any password fields
                 packet_info = self._process_packet(packet)
-                self._write_to_output(packet_info, 'traffic')
+                
+                # Log packet information
+                self._write_to_output({
+                    'packet_number': packet_count,
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    'protocol': packet_info.get('protocol', 'unknown'),
+                    'source': packet_info.get('source', 'unknown'),
+                    'destination': packet_info.get('destination', 'unknown'),
+                    'operation': packet_info.get('operation', 'unknown'),
+                    'size': packet_info.get('size', 0)
+                }, 'traffic')
+                
+                # Print progress every 10 packets
+                if packet_count % 10 == 0:
+                    elapsed_time = (datetime.now() - start_time).total_seconds()
+                    self.logger.info(f"Captured {packet_count} packets in {elapsed_time:.2f} seconds")
+                
         except KeyboardInterrupt:
-            print("\nCapture stopped by user")
+            self.logger.info("\nPacket capture stopped by user")
+            self._write_to_output({
+                'total_packets': packet_count,
+                'duration': (datetime.now() - start_time).total_seconds(),
+                'status': 'completed'
+            }, 'traffic')
+        except Exception as e:
+            self.handle_error("capture", str(e))
         finally:
             capture.close()
 
-    def update_env_file(self, share_path, username, debug_level, openai_key=None):
-        env_content = f"""SHARE_PATH={share_path}
-USERNAME={username}
-DEBUG_LEVEL={debug_level}"""
-        
-        if openai_key:
-            env_content += f"\nOPENAI_API_KEY={openai_key}"
-            
-        with open('.env', 'w') as f:
-            f.write(env_content)
-        self.logger.info("Updated .env file with new configuration")
-        
-        # Initialize ML analyzer if API key is provided
-        if openai_key:
-            self.initialize_ml()
-            
-    def initialize_ml(self):
-        """Initialize ML analyzer with OpenAI API key"""
-        try:
-            load_dotenv()
-            api_key = os.getenv('OPENAI_API_KEY')
-            if api_key:
-                self.ml_analyzer = MLAnalyzer(api_key)
-                self._write_to_output({
-                    "message": "ML analyzer initialized successfully"
-                }, 'info')
-            else:
-                self._write_to_output({
-                    "error": "OpenAI API key not found in .env file"
-                }, 'error')
-        except Exception as e:
-            self._write_to_output({
-                "error": f"Failed to initialize ML analyzer: {str(e)}"
-            }, 'error')
-            
     def analyze_share_type(self, path):
         if path.startswith('\\\\'):
             try:
@@ -670,53 +885,50 @@ DEBUG_LEVEL={debug_level}"""
         return "Unknown"
 
     def analyze_share(self):
-        load_dotenv()
-        share_path = os.getenv('SHARE_PATH')
-        username = os.getenv('USERNAME')
+        # Authenticate with the share
+        if not self.authenticate(getpass.getpass(f"Enter password for user {self.username}: ")):
+            return
         
         # Share Analysis
         self._write_to_output({
-            "type": "share_analysis",
-            "path": share_path,
-            "user": username
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "share_type": self.analyze_share_type(self.share_path),
+            "path": self.share_path,
+            "user": self.username
         }, 'share')
         
         # Network Analysis
-        network_info = self.get_network_info()
-        self._write_to_output({
-            "type": "network_info",
-            "details": network_info
-        }, 'network')
+        network_info = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "latency": self.metrics.measure_latency(self.share_path),
+            "throughput": self.metrics.measure_throughput(self.share_path),
+            "packet_loss": self.metrics.calculate_packet_loss(),
+            "connection_status": "active"
+        }
         
-        # Performance Metrics
+        # Security Analysis
         self._write_to_output({
-            "type": "performance",
-            "tcp_window": network_info.get('tcp_window', {}),
-            "mtu": network_info.get('mtu', {})
-        }, 'performance')
-        
-        # Security Check
-        self._write_to_output({
-            "type": "security_check",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "encryption": "enabled",
             "auth_method": "kerberos"
         }, 'security')
 
-        share_type = self.analyze_share_type(share_path)
+        share_type = self.analyze_share_type(self.share_path)
         
         analysis = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "share_type": share_type,
-            "share_path": share_path,
-            "username": username,
-            "network_info": network_info
+            "share_path": self.share_path,
+            "username": self.username,
+            "network_info": network_info,
+            "protocol_info": self.protocol_info.get_info()
         }
         
         # Additional analysis based on share type
         if share_type == "DFS":
-            analysis.update(self._analyze_dfs(share_path))
+            analysis.update(self._analyze_dfs(self.share_path))
         elif share_type == "NFS":
-            analysis.update(self._analyze_nfs(share_path))
+            analysis.update(self._analyze_nfs(self.share_path))
             
         self._write_analysis(analysis)
 
@@ -746,27 +958,52 @@ DEBUG_LEVEL={debug_level}"""
             self.handle_error("nfs_analysis", str(e))
         return info
 
-    def _write_analysis(self, analysis):
-        with open(self.output_file, 'w') as f:
-            f.write("=== Share Analysis Report ===\n\n")
-            f.write(f"Share Type: {analysis['share_type']}\n")
-            f.write(f"Share Path: {analysis['share_path']}\n")
-            f.write(f"Username: {analysis['username']}\n\n")
+    def _write_analysis(self, analysis_data):
+        """Write analysis results to JSON file with ISO 8601 timestamps"""
+        # Ensure the timestamp is in ISO 8601 format with UTC timezone
+        timestamp = datetime.now(timezone.utc)
+        
+        # Update all timestamps in the analysis data to ISO 8601 format
+        def convert_timestamps(obj):
+            if isinstance(obj, dict):
+                return {k: convert_timestamps(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_timestamps(item) for item in obj]
+            elif isinstance(obj, datetime):
+                return obj.astimezone(timezone.utc).isoformat()
+            return obj
+        
+        analysis_data = convert_timestamps(analysis_data)
+        analysis_data['timestamp'] = timestamp.isoformat()
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Write to analysis_results.json in the output directory
+        results_file = os.path.join(self.output_dir, 'analysis_results.json')
+        
+        try:
+            # Load existing results if file exists
+            if os.path.exists(results_file):
+                with open(results_file, 'r') as f:
+                    existing_data = json.load(f)
+                    if not isinstance(existing_data, list):
+                        existing_data = [existing_data]
+            else:
+                existing_data = []
             
-            f.write("=== Network Information ===\n")
-            f.write(f"Active Ports: {', '.join(map(str, analysis['network_info']['ports']))}\n")
-            f.write(f"MTU Settings: {json.dumps(analysis['network_info']['mtu'], indent=2)}\n\n")
+            # Add new analysis
+            existing_data.append(analysis_data)
             
-            if 'dfs_details' in analysis:
-                f.write("=== DFS Details ===\n")
-                f.write(analysis['dfs_details'])
-                f.write("\nNamespace Information:\n")
-                f.write(analysis['namespace'])
+            # Write updated results
+            with open(results_file, 'w') as f:
+                json.dump(existing_data, f, indent=2, ensure_ascii=False)
+                
+            self.logger.info(f"Analysis results written to {results_file}")
             
-            if 'nfs_stats' in analysis:
-                f.write("=== NFS Details ===\n")
-                f.write(analysis['nfs_stats'])
-
+        except Exception as e:
+            self.logger.error(f"Error writing analysis results: {str(e)}")
+            
     def generate_summary_report(self):
         """Generate a comprehensive analysis summary with ML insights"""
         network_info = self.get_network_info()
@@ -788,7 +1025,7 @@ DEBUG_LEVEL={debug_level}"""
             ml_insights["predictions"] = self.ml_analyzer.predict_performance(self.metrics)
         
         summary = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "network_metrics": self.metrics.get_statistics(),
             "error_summary": dict(self.error_counts),
             "performance_indicators": {
@@ -798,7 +1035,8 @@ DEBUG_LEVEL={debug_level}"""
             },
             "detected_issues": detected_issues,
             "optimization_recommendations": optimization_recommendations,
-            "ml_insights": ml_insights
+            "ml_insights": ml_insights,
+            "protocol_info": self.protocol_info.get_info()
         }
         
         self._write_to_output(summary, 'summary')
@@ -855,23 +1093,77 @@ DEBUG_LEVEL={debug_level}"""
             
         return (total_bytes * 8) / total_time  # bits per second
 
-def main():
-    analyzer = ShareAnalyzer()
+def download_manuf_file():
+    """Download Wireshark manufacturer database"""
+    manuf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manuf")
+    if not os.path.exists(manuf_path):
+        try:
+            url = "https://gitlab.com/wireshark/wireshark/-/raw/master/manuf"
+            response = requests.get(url)
+            response.raise_for_status()
+            with open(manuf_path, 'wb') as f:
+                f.write(response.content)
+            logging.info("Downloaded Wireshark manufacturer database")
+        except Exception as e:
+            logging.warning(f"Failed to download manufacturer database: {e}")
+
+def get_platform_info():
+    """Get platform-specific information and commands"""
+    system = platform.system().lower()
+    info = {
+        'is_windows': system == 'windows',
+        'is_linux': system == 'linux',
+        'is_macos': system == 'darwin',
+        'path_separator': '\\' if system == 'windows' else '/',
+        'commands': {}
+    }
     
-    if len(sys.argv) == 5:
-        share_path = sys.argv[1]
-        username = sys.argv[2]
-        debug_level = sys.argv[3]
-        openai_key = sys.argv[4]
-        
-        analyzer.update_env_file(share_path, username, debug_level, openai_key)
-        print("Configuration updated. Starting analysis...")
-        
-        analyzer.analyze_share()
-        analyzer.capture_traffic()
-        print(f"Analysis complete. Check {analyzer.output_file} for results.")
-    else:
+    if info['is_windows']:
+        info['commands'].update({
+            'route': ['route', 'print'],
+            'netstat': ['netstat', '-ano'],
+            'mount': ['net', 'use'],
+            'unmount': ['net', 'use', '/delete'],
+            'check_share': ['net', 'view'],
+        })
+    elif info['is_linux']:
+        info['commands'].update({
+            'route': ['ip', 'route'],
+            'netstat': ['netstat', '-tuln'],
+            'mount': ['mount', '-t', 'cifs'],
+            'unmount': ['umount'],
+            'check_share': ['smbclient', '-L'],
+        })
+    else:  # macOS
+        info['commands'].update({
+            'route': ['netstat', '-nr'],
+            'netstat': ['netstat', '-an'],
+            'mount': ['mount', '-t', 'smbfs'],
+            'unmount': ['umount'],
+            'check_share': ['smbutil', 'view'],
+        })
+    
+    return info
+
+def main():
+    download_manuf_file()
+    
+    if len(sys.argv) != 5:
         print("Usage: python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>")
+        sys.exit(1)
+
+    share_path = sys.argv[1]
+    username = sys.argv[2]
+    debug_level = int(sys.argv[3])
+    openai_key = sys.argv[4]
+    
+    # Initialize the analyzer with the credentials
+    analyzer = ShareAnalyzer(share_path, username, debug_level)
+    analyzer.update_env_file(share_path, username, debug_level, openai_key)
+    print("Configuration updated. Starting analysis...")
+    analyzer.analyze_share()
+    analyzer.capture_traffic()
+    print(f"Analysis complete. Check {analyzer.output_file} for results.")
 
 if __name__ == "__main__":
     main()
