@@ -52,7 +52,7 @@
   - Real-time performance monitoring
   - Actionable improvement suggestions
 
-### v1.3.0 (Current)
+### v1.3.0
 - ✅ Machine Learning Integration
   - OpenAI GPT-4 integration
   - Anomaly detection with Isolation Forest
@@ -66,6 +66,19 @@
   - Trend forecasting
   - Resource utilization predictions
   - Configuration recommendations
+
+### v1.4.0 (Current)
+- ✅ Virtual Environment Support
+  - Isolated dependencies
+  - Environment configuration
+  - Development setup tools
+  - Package management
+
+- ✅ Automatic Updates
+  - Version checking
+  - Dependency updates
+  - Update notifications
+  - Self-update capability
 
 ## Planned Features
 

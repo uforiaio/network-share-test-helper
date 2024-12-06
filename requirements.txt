@@ -1,11 +1,33 @@
-python-dotenv==1.0.0
-pyshark==0.6.0
-psutil==5.9.5
-scapy==2.5.0
-orca==1.8.0
-colorama==0.4.6
-emoji==2.8.0
-openai==1.3.0
+# Core Dependencies
+openai==1.3.5
 pandas==2.1.3
-scikit-learn==1.3.2
 numpy==1.26.2
+scikit-learn==1.3.2
+python-dotenv==1.0.0
+requests==2.31.0
+packaging==23.2
+
+# Network Analysis
+scapy==2.5.0
+pyshark==0.6.0
+psutil==5.9.6
+netifaces==0.11.0
+
+# Data Processing
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.18.0
+
+# Logging and Monitoring
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Development Tools
+black==23.11.0
+pylint==3.0.2
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0

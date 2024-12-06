@@ -30,19 +30,55 @@ A powerful command-line utility for analyzing DFS and NFS shares, combining trad
 
 ## Installation
 
-1. Install the required dependencies:
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/dfs-nfs-debugger.git
+cd dfs-nfs-debugger
+```
+
+2. Create and activate virtual environment:
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Ensure you have:
+4. Install the package in development mode:
+```bash
+pip install -e .
+```
+
+5. Create environment configuration:
+```bash
+# Copy the template
+copy env.template .env
+# Edit .env with your settings
+```
+
+6. Ensure you have:
    - Administrative privileges for network capture
    - OpenAI API key for ML features
    - Network access to target shares
 
 ## Usage
 
+### Running the Application
+
 ```bash
+# Activate virtual environment first
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# Run the application
 python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>
 ```
 
@@ -50,6 +86,24 @@ Example:
 ```bash
 python dfs_nfs_analyzer.py "\\share\info" "domain\user" "INFO" "sk-your-openai-key"
 ```
+
+### Updating the Application
+
+The application automatically checks for updates on startup. You can also manually check and update:
+
+```bash
+# Activate virtual environment first
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# Run the update script
+python update.py
+```
+
+This will:
+- Check for new versions of the application
+- Update dependencies if needed
+- Maintain virtual environment isolation
 
 ## Output Files
 
@@ -96,8 +150,13 @@ dfs-nfs-debugger/
 ├── docs/               # Project documentation
 ├── logs/              # Application execution logs
 ├── output/            # Performance data and analysis
+├── venv/              # Virtual environment
 ├── dfs_nfs_analyzer.py # Main application file
 ├── requirements.txt   # Python dependencies
+├── setup.py          # Package setup file
+├── env.template      # Environment variables template
+├── .env              # Environment variables
+├── .gitignore        # Git ignore rules
 └── README.md         # Project overview
 ```
 

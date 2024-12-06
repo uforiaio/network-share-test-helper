@@ -1,22 +1,34 @@
 # Project Structure
 
-## Files and Directories
+## Directory Layout
 
 ```
 dfs-nfs-debugger/
-├── dfs_nfs_analyzer.py    # Main application script
-├── requirements.txt       # Python dependencies
-├── .env                  # Configuration file (generated)
-├── output.txt           # Analysis output (generated)
-├── debug_analysis.log   # Debug logs (generated)
-└── docs/               # Documentation
-    ├── CONFIGURATION.md
-    ├── CONTEXT.md
-    ├── DEPENDENCIES.md
-    ├── GUIDE.md
-    ├── PROJECT_STRUCTURE.md
-    ├── README.md
-    └── TRACKING.md
+├── docs/               # Project documentation
+│   ├── CONFIGURATION.md
+│   ├── CONTEXT.md
+│   ├── DEPENDENCIES.md
+│   ├── GUIDE.md
+│   ├── PROJECT_STRUCTURE.md
+│   └── TRACKING.md
+│
+├── logs/              # Application execution logs
+│   └── README.md      # Log directory documentation
+│
+├── output/            # Performance data and analysis
+│   └── README.md      # Output directory documentation
+│
+├── venv/              # Virtual environment (not in repo)
+│
+├── dfs_nfs_analyzer.py # Main application file
+├── version_check.py   # Version and dependency management
+├── update.py         # Update script
+├── requirements.txt   # Python dependencies
+├── setup.py          # Package setup file
+├── env.template      # Environment variables template
+├── .env              # Environment variables (not in repo)
+├── .gitignore        # Git ignore rules
+└── README.md         # Project overview
 ```
 
 ## Code Structure

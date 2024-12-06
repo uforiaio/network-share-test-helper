@@ -1,5 +1,37 @@
 # User Guide
 
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/dfs-nfs-debugger.git
+cd dfs-nfs-debugger
+```
+
+2. Create and activate virtual environment:
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+pip install -e .
+```
+
+4. Configure environment:
+```bash
+copy env.template .env  # Windows
+cp env.template .env    # Linux/Mac
+# Edit .env with your settings
+```
+
 ## Quick Start
 
 1. Install dependencies:
@@ -113,3 +145,16 @@ GPT-4 powered analysis provides:
    - Verify OpenAI API key
    - Check internet connectivity
    - Ensure sufficient data points
+
+## Updating the Application
+
+The application checks for updates on startup. You can also update manually:
+
+```bash
+python update.py
+```
+
+This will:
+- Check for new versions
+- Update dependencies
+- Maintain virtual environment
