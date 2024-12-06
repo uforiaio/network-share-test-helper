@@ -96,6 +96,32 @@ TIMESTAMP_FORMAT=ISO8601  # All timestamps use ISO 8601
 
 ## Performance Settings
 
+### NetworkMetrics Configuration
+- **Capture Settings**
+  ```ini
+  METRICS_ENABLED=true
+  CAPTURE_BUFFER=2MB
+  METRICS_INTERVAL=5s
+  ASYNC_CAPTURE=true
+  CLEANUP_INTERVAL=30s
+  ```
+
+- **Performance Monitoring**
+  ```ini
+  LATENCY_THRESHOLD=100ms
+  BANDWIDTH_ALERT=90%
+  CONNECTION_LIMIT=1000
+  RESOURCE_CHECK_INTERVAL=15s
+  ```
+
+- **Resource Management**
+  ```ini
+  MAX_CONNECTIONS=500
+  POOL_SIZE=100
+  CLEANUP_THRESHOLD=75%
+  ASYNC_TIMEOUT=30s
+  ```
+
 ### Packet Capture
 - Buffer size: 1MB default
 - Capture duration: Configurable

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from collections import defaultdict
 import platform
 import requests
+import logging
 
 from ..metrics.network_metrics import NetworkMetrics
 from ..metrics.protocol_info import ProtocolInfo
@@ -51,7 +52,7 @@ class ShareAnalyzer:
         
         # Set up directories and logging
         self._setup_directories()
-        self.logger = self._setup_logging()
+        self._setup_logging()
 
     def _get_platform_info(self):
         """Get platform-specific information and commands."""
@@ -123,6 +124,28 @@ class ShareAnalyzer:
         self.output_file = os.path.join(self.output_dir, f"analysis_{filename_timestamp}.log")
         self.debug_log = os.path.join(self.logs_dir, f"debug_analysis_{filename_timestamp}.log")
 
+    def _setup_logging(self):
+        """Set up component-specific logging configuration."""
+        # Configure component-specific log file
+        log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Create a component-specific log file
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_file = os.path.join(log_dir, f'share_analyzer_{timestamp}.log')
+        
+        # Set up file handler for this specific analysis session
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(
+            logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        )
+        logger.addHandler(file_handler)
+        
+        # Log initial configuration
+        logger.info(f"Initialized ShareAnalyzer for path: {self.share_path}")
+        logger.info(f"Platform info: {self.platform_info}")
+        logger.info(f"Debug level: {self.debug_level}")
+
     def authenticate(self, password=None):
         """Authenticate and connect to the network share.
         
@@ -159,14 +182,14 @@ class ShareAnalyzer:
             if result.returncode == 0:
                 self._authenticated = True
                 self._connected_share = True
-                self.logger.info("Successfully authenticated to share")
+                logger.info("Successfully authenticated to share")
                 return True
             else:
-                self.logger.error(f"Authentication failed: {result.stderr}")
+                logger.error(f"Authentication failed: {result.stderr}")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"Authentication error: {str(e)}")
+            logger.error(f"Authentication error: {str(e)}")
             return False
 
     def analyze_share(self, duration=60, capture_filter=None):
@@ -180,12 +203,12 @@ class ShareAnalyzer:
             dict: Analysis results containing metrics, issues, and recommendations
         """
         if not self._authenticated:
-            self.logger.error("Not authenticated to share. Call authenticate() first.")
+            logger.error("Not authenticated to share. Call authenticate() first.")
             return None
             
         try:
             # Start network capture
-            self.logger.info(f"Starting network capture for {duration} seconds...")
+            logger.info(f"Starting network capture for {duration} seconds...")
             self.is_capturing = True
             
             # Collect network metrics
@@ -218,7 +241,7 @@ class ShareAnalyzer:
                         issues
                     )
                 except Exception as e:
-                    self.logger.warning(f"ML analysis failed: {str(e)}")
+                    logger.warning(f"ML analysis failed: {str(e)}")
             
             # Compile results
             results = {
@@ -239,22 +262,22 @@ class ShareAnalyzer:
             return results
             
         except Exception as e:
-            self.logger.error(f"Analysis failed: {str(e)}")
+            logger.error(f"Analysis failed: {str(e)}")
             return None
         finally:
             self.is_capturing = False
             
     def _log_analysis_summary(self, results):
         """Log a summary of the analysis results."""
-        self.logger.info("=== Analysis Summary ===")
-        self.logger.info(f"Share: {results['share_path']}")
-        self.logger.info(f"Issues found: {len(results['issues'])}")
-        self.logger.info(f"Recommendations: {len(results['recommendations'])}")
+        logger.info("=== Analysis Summary ===")
+        logger.info(f"Share: {results['share_path']}")
+        logger.info(f"Issues found: {len(results['issues'])}")
+        logger.info(f"Recommendations: {len(results['recommendations'])}")
         
         if results['issues']:
-            self.logger.info("\nTop issues:")
+            logger.info("\nTop issues:")
             for issue in results['issues'][:3]:  # Show top 3 issues
-                self.logger.info(f"- {issue['description']}")
+                logger.info(f"- {issue['description']}")
 
     def cleanup(self):
         """Clean up resources and disconnect from share.
@@ -267,12 +290,12 @@ class ShareAnalyzer:
         try:
             # Stop any ongoing capture
             if self.is_capturing:
-                self.logger.info("Stopping network capture...")
+                logger.info("Stopping network capture...")
                 self.is_capturing = False
             
             # Disconnect from share if connected
             if self._connected_share:
-                self.logger.info("Disconnecting from share...")
+                logger.info("Disconnecting from share...")
                 try:
                     disconnect_cmd = self.platform_info['disconnect_cmd'].format(
                         share_path=self.share_path
@@ -287,10 +310,10 @@ class ShareAnalyzer:
                         self._connected_share = False
                         self._authenticated = False
                     else:
-                        self.logger.error(f"Failed to disconnect: {result.stderr}")
+                        logger.error(f"Failed to disconnect: {result.stderr}")
                         success = False
                 except Exception as e:
-                    self.logger.error(f"Error disconnecting from share: {str(e)}")
+                    logger.error(f"Error disconnecting from share: {str(e)}")
                     success = False
             
             # Clean up components
@@ -302,11 +325,11 @@ class ShareAnalyzer:
                 if self.ml_analyzer:
                     self.ml_analyzer.cleanup()
             except Exception as e:
-                self.logger.error(f"Error cleaning up components: {str(e)}")
+                logger.error(f"Error cleaning up components: {str(e)}")
                 success = False
                 
             return success
             
         except Exception as e:
-            self.logger.error(f"Cleanup failed: {str(e)}")
+            logger.error(f"Cleanup failed: {str(e)}")
             return False

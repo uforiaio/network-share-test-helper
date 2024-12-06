@@ -20,13 +20,61 @@ dfs-nfs-debugger/
 │   ├── debug_*.log     # Debug logs (ISO 8601)
 │   ├── error_*.log     # Error logs (ISO 8601)
 │   └── stats_*.log     # Statistics (ISO 8601)
-└── output/            # Analysis output
-    ├── analysis_*.json  # Results (ISO 8601)
-    ├── capture_*.pcapng # Network captures
-    └── README.md       # Output documentation
+├── output/            # Analysis output
+│   ├── analysis_*.json  # Results (ISO 8601)
+│   ├── capture_*.pcapng # Network captures
+│   └── README.md       # Output documentation
+└── src/               # Source code
+    ├── analyzer/
+    │   ├── __init__.py
+    │   ├── share_analyzer.py
+    │   ├── network_metrics.py
+    │   ├── protocol_info.py
+    │   └── issue_detector.py
+    ├── async/
+    │   ├── __init__.py
+    │   ├── capture.py
+    │   ├── metrics.py
+    │   └── resource.py
+    ├── utils/
+    │   ├── __init__.py
+    │   ├── cleanup.py
+    │   ├── metrics.py
+    │   └── async_helpers.py
+    └── tests/
+        ├── __init__.py
+        ├── test_analyzer/
+        ├── test_async/
+        └── test_utils/
 ```
 
 ## Core Components
+
+### Source Structure
+```
+src/
+├── analyzer/
+│   ├── __init__.py
+│   ├── share_analyzer.py
+│   ├── network_metrics.py
+│   ├── protocol_info.py
+│   └── issue_detector.py
+├── async/
+│   ├── __init__.py
+│   ├── capture.py
+│   ├── metrics.py
+│   └── resource.py
+├── utils/
+│   ├── __init__.py
+│   ├── cleanup.py
+│   ├── metrics.py
+│   └── async_helpers.py
+└── tests/
+    ├── __init__.py
+    ├── test_analyzer/
+    ├── test_async/
+    └── test_utils/
+```
 
 ### Main Script (dfs_nfs_analyzer.py)
 

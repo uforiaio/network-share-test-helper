@@ -93,6 +93,17 @@ brew install samba
 
 ## Version Management
 
+### Test Dependencies
+- `pytest==7.4.3`: Testing framework
+- `pytest-asyncio==0.21.1`: Async test support
+- `pytest-cov==4.1.0`: Coverage reporting
+- `pytest-mock==3.12.0`: Mocking support
+- `pytest-timeout==2.2.0`: Test timeout handling
+- `aiohttp==3.9.1`: Async HTTP client/server
+- `asynctest==0.13.0`: Async testing utilities
+- `coverage==7.3.2`: Code coverage tool
+- `mock==5.1.0`: Mocking library
+
 ### Version Checking
 - Automatic update checks
 - Dependency validation

@@ -86,6 +86,57 @@ class MLAnalyzer:
             logger.error(f"Basic anomaly detection failed: {str(e)}")
             return []
             
+    def _format_anomalies(self, df, anomaly_indices):
+        """Format detected anomalies into structured output.
+        
+        Args:
+            df (pd.DataFrame): DataFrame containing the metrics
+            anomaly_indices (np.ndarray): Indices of detected anomalies
+            
+        Returns:
+            list: List of formatted anomaly dictionaries
+        """
+        anomalies = []
+        metrics = df.columns.tolist()
+        
+        for idx in anomaly_indices:
+            anomaly = {
+                'timestamp': datetime.now().isoformat(),
+                'metrics': {},
+                'severity': 'high'  # Can be enhanced with actual severity calculation
+            }
+            
+            # Add anomalous values for each metric
+            for metric in metrics:
+                value = df.iloc[idx][metric]
+                mean = df[metric].mean()
+                std = df[metric].std()
+                z_score = (value - mean) / std if std != 0 else 0
+                
+                anomaly['metrics'][metric] = {
+                    'value': float(value),
+                    'mean': float(mean),
+                    'std': float(std),
+                    'z_score': float(z_score),
+                    'deviation_percentage': float(abs((value - mean) / mean * 100)) if mean != 0 else 0
+                }
+            
+            # Add description based on the most deviant metric
+            most_deviant = max(
+                anomaly['metrics'].items(),
+                key=lambda x: abs(x[1]['z_score'])
+            )
+            
+            anomaly['description'] = (
+                f"Anomalous {most_deviant[0]} detected: "
+                f"{most_deviant[1]['value']:.2f} "
+                f"({most_deviant[1]['deviation_percentage']:.1f}% deviation from mean)"
+            )
+            
+            anomalies.append(anomaly)
+        
+        return anomalies
+            
     def predict_performance(self, metrics, timeframe_minutes=30):
         """Predict performance trends.
         

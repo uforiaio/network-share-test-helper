@@ -1,7 +1,12 @@
 """Network metrics collection and analysis."""
 
 import statistics
+import os
+import threading
 from datetime import datetime, timezone
+from scapy.all import sniff, wrpcap
+from scapy.layers.inet import IP, TCP
+from contextlib import contextmanager
 from ..utils.logging import setup_logger
 
 logger = setup_logger(__name__)
@@ -17,7 +22,109 @@ class NetworkMetrics:
         self.window_sizes = []
         self.packet_loss_count = 0
         self.total_packets = 0
+        self._capture = None
+        self._capture_thread = None
+        self._stop_capture = threading.Event()
+        self._capture_file = None
         
+    @contextmanager
+    def capture_packets(self, interface=None, filter_str=None, timeout=None):
+        """Start packet capture with proper resource cleanup.
+        
+        Args:
+            interface (str): Network interface to capture on. None for default.
+            filter_str (str): BPF filter string for capture. None for all packets.
+            timeout (int): Capture timeout in seconds. None for no timeout.
+            
+        Yields:
+            bool: True if capture started successfully, False otherwise.
+        """
+        try:
+            # Set up capture file
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            self._capture_file = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                'captures',
+                f'capture_{timestamp}.pcap'
+            )
+            os.makedirs(os.path.dirname(self._capture_file), exist_ok=True)
+            
+            # Start capture in background thread
+            self._stop_capture.clear()
+            self._capture_thread = threading.Thread(
+                target=self._capture_packets,
+                args=(interface, filter_str, timeout)
+            )
+            self._capture_thread.start()
+            logger.info(f"Started packet capture on {interface or 'default interface'}")
+            
+            yield True
+            
+        except Exception as e:
+            logger.error(f"Failed to start packet capture: {e}")
+            yield False
+            
+        finally:
+            # Cleanup
+            self.stop_capture()
+            
+    def _capture_packets(self, interface, filter_str, timeout):
+        """Background packet capture function."""
+        try:
+            self._capture = sniff(
+                iface=interface,
+                filter=filter_str,
+                timeout=timeout,
+                stop_filter=lambda _: self._stop_capture.is_set(),
+                prn=self._process_packet,
+                store=False
+            )
+        except Exception as e:
+            logger.error(f"Error during packet capture: {e}")
+            
+    def _process_packet(self, packet):
+        """Process a captured packet."""
+        try:
+            self.increment_total_packets()
+            
+            if IP in packet and TCP in packet:
+                # Get packet size
+                self.add_packet_size(len(packet))
+                
+                # Get window size
+                if packet[TCP].window:
+                    self.add_window_size(packet[TCP].window)
+                    
+                # Check for retransmission
+                if packet[TCP].flags.R:
+                    self.increment_retransmissions()
+                    
+                # Estimate RTT from TCP timestamps if available
+                if hasattr(packet[TCP], 'options'):
+                    for opt_name, opt_value in packet[TCP].options:
+                        if opt_name == 'Timestamp':
+                            self.add_rtt_sample(opt_value[1] - opt_value[0])
+                            
+        except Exception as e:
+            logger.error(f"Error processing packet: {e}")
+            
+    def stop_capture(self):
+        """Stop packet capture and cleanup resources."""
+        if self._capture_thread and self._capture_thread.is_alive():
+            self._stop_capture.set()
+            self._capture_thread.join(timeout=5)
+            
+            if self._capture_file and self._capture:
+                try:
+                    wrpcap(self._capture_file, self._capture)
+                    logger.info(f"Saved capture to {self._capture_file}")
+                except Exception as e:
+                    logger.error(f"Failed to save capture file: {e}")
+            
+            self._capture = None
+            self._capture_thread = None
+            self._capture_file = None
+            
     def add_rtt_sample(self, rtt_ms):
         """Add a round-trip time sample."""
         if rtt_ms > 0:
