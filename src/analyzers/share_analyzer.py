@@ -122,3 +122,191 @@ class ShareAnalyzer:
         filename_timestamp = timestamp_utc.strftime("%Y-%m-%dT%H-%M-%S")
         self.output_file = os.path.join(self.output_dir, f"analysis_{filename_timestamp}.log")
         self.debug_log = os.path.join(self.logs_dir, f"debug_analysis_{filename_timestamp}.log")
+
+    def authenticate(self, password=None):
+        """Authenticate and connect to the network share.
+        
+        Args:
+            password (str, optional): Share password. If not provided, will prompt.
+            
+        Returns:
+            bool: True if authentication successful, False otherwise.
+        """
+        if self._authenticated:
+            return True
+            
+        try:
+            # Get password if not provided
+            if not password:
+                password = getpass.getpass(f"Enter password for {self.username}: ")
+            
+            # Format connection command
+            connect_cmd = self.platform_info['connect_cmd'].format(
+                share_path=self.share_path,
+                username=self.username,
+                password=password,
+                domain=self.domain or '.'
+            )
+            
+            # Execute connection command
+            result = subprocess.run(
+                connect_cmd,
+                shell=True,
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode == 0:
+                self._authenticated = True
+                self._connected_share = True
+                self.logger.info("Successfully authenticated to share")
+                return True
+            else:
+                self.logger.error(f"Authentication failed: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Authentication error: {str(e)}")
+            return False
+
+    def analyze_share(self, duration=60, capture_filter=None):
+        """Analyze the network share for performance and issues.
+        
+        Args:
+            duration (int): Duration in seconds to capture traffic
+            capture_filter (str, optional): Custom Wireshark capture filter
+            
+        Returns:
+            dict: Analysis results containing metrics, issues, and recommendations
+        """
+        if not self._authenticated:
+            self.logger.error("Not authenticated to share. Call authenticate() first.")
+            return None
+            
+        try:
+            # Start network capture
+            self.logger.info(f"Starting network capture for {duration} seconds...")
+            self.is_capturing = True
+            
+            # Collect network metrics
+            network_data = self.metrics.collect_metrics(
+                self.share_path,
+                duration=duration,
+                capture_filter=capture_filter
+            )
+            
+            # Analyze protocol information
+            protocol_data = self.protocol_info.analyze_protocols(network_data)
+            
+            # Detect potential issues
+            issues = self.issue_detector.detect_issues(network_data, protocol_data)
+            
+            # Get performance recommendations
+            recommendations = self.performance_optimizer.get_recommendations(
+                network_data,
+                protocol_data,
+                issues
+            )
+            
+            # Run ML analysis if available
+            ml_insights = None
+            if self.ml_analyzer:
+                try:
+                    ml_insights = self.ml_analyzer.analyze(
+                        network_data,
+                        protocol_data,
+                        issues
+                    )
+                except Exception as e:
+                    self.logger.warning(f"ML analysis failed: {str(e)}")
+            
+            # Compile results
+            results = {
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'share_path': self.share_path,
+                'metrics': network_data,
+                'protocols': protocol_data,
+                'issues': issues,
+                'recommendations': recommendations
+            }
+            
+            if ml_insights:
+                results['ml_insights'] = ml_insights
+                
+            # Log summary
+            self._log_analysis_summary(results)
+            
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"Analysis failed: {str(e)}")
+            return None
+        finally:
+            self.is_capturing = False
+            
+    def _log_analysis_summary(self, results):
+        """Log a summary of the analysis results."""
+        self.logger.info("=== Analysis Summary ===")
+        self.logger.info(f"Share: {results['share_path']}")
+        self.logger.info(f"Issues found: {len(results['issues'])}")
+        self.logger.info(f"Recommendations: {len(results['recommendations'])}")
+        
+        if results['issues']:
+            self.logger.info("\nTop issues:")
+            for issue in results['issues'][:3]:  # Show top 3 issues
+                self.logger.info(f"- {issue['description']}")
+
+    def cleanup(self):
+        """Clean up resources and disconnect from share.
+        
+        Returns:
+            bool: True if cleanup successful, False otherwise.
+        """
+        success = True
+        
+        try:
+            # Stop any ongoing capture
+            if self.is_capturing:
+                self.logger.info("Stopping network capture...")
+                self.is_capturing = False
+            
+            # Disconnect from share if connected
+            if self._connected_share:
+                self.logger.info("Disconnecting from share...")
+                try:
+                    disconnect_cmd = self.platform_info['disconnect_cmd'].format(
+                        share_path=self.share_path
+                    )
+                    result = subprocess.run(
+                        disconnect_cmd,
+                        shell=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    if result.returncode == 0:
+                        self._connected_share = False
+                        self._authenticated = False
+                    else:
+                        self.logger.error(f"Failed to disconnect: {result.stderr}")
+                        success = False
+                except Exception as e:
+                    self.logger.error(f"Error disconnecting from share: {str(e)}")
+                    success = False
+            
+            # Clean up components
+            try:
+                self.metrics.cleanup()
+                self.protocol_info.cleanup()
+                self.issue_detector.cleanup()
+                self.performance_optimizer.cleanup()
+                if self.ml_analyzer:
+                    self.ml_analyzer.cleanup()
+            except Exception as e:
+                self.logger.error(f"Error cleaning up components: {str(e)}")
+                success = False
+                
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Cleanup failed: {str(e)}")
+            return False
