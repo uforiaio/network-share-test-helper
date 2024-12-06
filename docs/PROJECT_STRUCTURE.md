@@ -4,73 +4,152 @@
 
 ```
 dfs-nfs-debugger/
-├── dfs_nfs_analyzer.py     # Main analyzer script
-├── requirements.txt        # Python dependencies
-├── setup.py               # Installation script
-├── env.template           # Environment variables template
-├── README.md             # Project documentation
-├── docs/                 # Detailed documentation
-│   ├── CONFIGURATION.md  # Configuration guide
-│   ├── CONTEXT.md       # Project context
-│   ├── DEPENDENCIES.md  # Dependency information
-│   ├── GUIDE.md        # User guide
-│   ├── PROJECT_STRUCTURE.md  # This file
-│   └── TRACKING.md     # Issue tracking
-├── logs/                # Debug and analysis logs
-└── output/             # Analysis results
+├── dfs_nfs_analyzer.py   # Main analyzer script
+├── requirements.txt      # Python dependencies
+├── setup.py             # Installation script
+├── env.template         # Environment template
+├── README.md           # Project documentation
+├── docs/               # Documentation
+│   ├── CONFIGURATION.md
+│   ├── CONTEXT.md
+│   ├── DEPENDENCIES.md
+│   ├── GUIDE.md
+│   ├── PROJECT_STRUCTURE.md
+│   └── TRACKING.md
+├── logs/               # Application logs
+│   ├── debug_*.log     # Debug logs (ISO 8601)
+│   ├── error_*.log     # Error logs (ISO 8601)
+│   └── stats_*.log     # Statistics (ISO 8601)
+└── output/            # Analysis output
+    ├── analysis_results.json  # Results (ISO 8601)
+    ├── capture_*.pcapng      # Network captures
+    ├── analysis_*.log        # Analysis logs (ISO 8601)
+    └── README.md            # Output documentation
 ```
 
 ## Core Components
 
 ### Main Script (dfs_nfs_analyzer.py)
-- `ShareAnalyzer`: Main class for share analysis
-- `NetworkMetrics`: Network performance measurements
-- `ProtocolInfo`: Protocol and version information
-- `IssueDetector`: Network issue detection
-- `PerformanceOptimizer`: Performance recommendations
+
+#### Core Classes
+- `ShareAnalyzer`: Share analysis and monitoring
+  - Protocol detection
+  - Performance metrics
+  - Error handling
+  - Data collection
+
+- `NetworkMetrics`: Network performance
+  - Latency measurement
+  - Throughput calculation
+  - Packet analysis
+  - Connection monitoring
+
+- `ProtocolInfo`: Protocol handling
+  - Version detection
+  - Feature negotiation
+  - Capability checking
+  - Backend identification
+
+- `IssueDetector`: Problem detection
+  - Error pattern matching
+  - Performance analysis
+  - Anomaly detection
+  - Root cause analysis
+
+- `PerformanceOptimizer`: Optimization
+  - Configuration tuning
+  - Resource allocation
+  - Protocol optimization
+  - Performance recommendations
 
 ### Configuration
+
+#### Environment Files
 - `.env`: Runtime configuration
-- `env.template`: Configuration template
-- Environment variables for:
   - Share paths
   - Credentials
   - Debug levels
   - API keys
 
+- `env.template`: Configuration template
+  - Default settings
+  - Example values
+  - Documentation
+  - Security guidelines
+
 ### Output Organization
-- `logs/`: Debug and analysis logs with ISO 8601 timestamps
-- `output/`: Analysis results in JSON format
-  - Network metrics
-  - Protocol information
+
+#### Logs Directory
+- Debug logs (ISO 8601)
+  - Operation tracking
+  - Error reporting
+  - Performance metrics
+  - System state
+
+- Error logs (ISO 8601)
+  - Exception details
+  - Stack traces
+  - Error context
+  - Recovery actions
+
+- Statistics (ISO 8601)
   - Performance data
-  - Issue reports
+  - Resource usage
+  - Operation counts
+  - Trend analysis
+
+#### Output Directory
+- Analysis results (JSON)
+  - Share information
+  - Network metrics
+  - Protocol data
+  - Performance stats
+  - All timestamps in ISO 8601
+
+- Network captures
+  - Raw packet data
+  - Filtered traffic
+  - Sanitized content
+  - Protocol-specific info
+
+- Analysis logs
+  - Detailed analysis
+  - ML insights
+  - Recommendations
+  - ISO 8601 timestamps
 
 ## Key Features
 
 ### Network Analysis
 - Packet capture and analysis
 - Protocol version detection
-- Performance metrics
-- Latency measurements
-- Throughput analysis
+- Performance measurement
+- Latency monitoring
+- Throughput calculation
 
 ### Protocol Support
-- SMB/CIFS
-- NFS
-- Cross-platform compatibility
-  - Windows (primary)
-  - Linux (experimental)
-  - macOS (experimental)
+- SMB/CIFS handling
+  - Version detection
+  - Feature negotiation
+  - Performance tuning
+  - Error handling
 
-### Security
-- Secure credential handling
-- No password storage
-- Sanitized logging
+- NFS support
+  - Version detection
+  - Mount management
+  - Performance tuning
+  - Error handling
+
+### Security Features
+- Credential protection
+- Traffic sanitization
+- Log file security
 - API key management
+- Access monitoring
 
 ### Reporting
-- JSON-formatted results
+- JSON output format
 - ISO 8601 timestamps
-- Detailed metrics
-- Performance recommendations
+- Performance metrics
+- ML-based insights
+- Optimization guidance

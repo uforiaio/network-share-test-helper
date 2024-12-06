@@ -592,8 +592,6 @@ class ShareAnalyzer:
         self.issue_detector = IssueDetector()
         self.performance_optimizer = PerformanceOptimizer()
         self.ml_analyzer = None  # Will be initialized after loading API key
-        self.load_env_config()
-        self.logger = self._setup_logging()
         self.error_counts = defaultdict(int)
         self.output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
         self.logs_dir = os.path.join(self.output_dir, "logs")
@@ -607,6 +605,9 @@ class ShareAnalyzer:
         self.output_file = os.path.join(self.output_dir, f"analysis_{filename_timestamp}.log")
         self.debug_log = os.path.join(self.logs_dir, f"debug_analysis_{filename_timestamp}.log")
         
+        self.load_env_config()
+        self.logger = self._setup_logging()
+            
     def _setup_logging(self):
         """Set up logging with ISO 8601 timestamps"""
         logger = logging.getLogger('ShareAnalyzer')
@@ -822,53 +823,63 @@ class ShareAnalyzer:
             return {"error": str(e)}
 
     def capture_traffic(self, interface="Ethernet"):
-        if not WIRESHARK_AVAILABLE:
-            self.handle_error("wireshark", "Wireshark is not available. Please install it to capture traffic.")
-            return
-        
-        # Set the path to TShark executable
-        os.environ["TSHARK_PATH"] = "C:\\Program Files\\Wireshark\\tshark.exe"
-        
+        """Capture network traffic on specified interface"""
         try:
             self.logger.info(f"Starting packet capture on interface: {interface}")
+            
+            # Set up capture file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            capture_file = os.path.join(self.output_dir, f"capture_{timestamp}.pcapng")
+            
+            # Initialize capture with output file and capture filter for SMB/CIFS traffic
+            capture = pyshark.LiveCapture(
+                interface=interface,
+                output_file=capture_file,
+                bpf_filter="port 445 or port 139 or port 135",  # SMB, NetBIOS, and RPC ports
+                use_json=True
+            )
+            
+            self.logger.info(f"Saving capture to: {capture_file}")
             self.logger.info("Capturing DFS/NFS/SMB traffic... Press Ctrl+C to stop")
             
-            capture = pyshark.LiveCapture(interface=interface, display_filter="nfs || smb || smb2")
             packet_count = 0
             start_time = datetime.now()
             
-            for packet in capture.sniff_continuously(packet_count=100):
-                packet_count += 1
-                # Process packet and mask any password fields
-                packet_info = self._process_packet(packet)
-                
-                # Log packet information
-                self._write_to_output({
-                    'packet_number': packet_count,
-                    'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'protocol': packet_info.get('protocol', 'unknown'),
-                    'source': packet_info.get('source', 'unknown'),
-                    'destination': packet_info.get('destination', 'unknown'),
-                    'operation': packet_info.get('operation', 'unknown'),
-                    'size': packet_info.get('size', 0)
-                }, 'traffic')
-                
-                # Print progress every 10 packets
-                if packet_count % 10 == 0:
-                    elapsed_time = (datetime.now() - start_time).total_seconds()
-                    self.logger.info(f"Captured {packet_count} packets in {elapsed_time:.2f} seconds")
-                
-        except KeyboardInterrupt:
-            self.logger.info("\nPacket capture stopped by user")
-            self._write_to_output({
-                'total_packets': packet_count,
-                'duration': (datetime.now() - start_time).total_seconds(),
-                'status': 'completed'
-            }, 'traffic')
+            try:
+                # Remove packet count limit for continuous capture
+                for packet in capture.sniff_continuously():
+                    packet_count += 1
+                    
+                    try:
+                        # Process packet and log details
+                        self._process_packet(packet)
+                        
+                        if packet_count % 10 == 0:
+                            elapsed = (datetime.now() - start_time).total_seconds()
+                            self.logger.info(f"Captured {packet_count} packets in {elapsed:.1f} seconds")
+                    
+                    except Exception as e:
+                        self.logger.debug(f"Error processing packet: {e}")
+                        continue
+                        
+            except KeyboardInterrupt:
+                elapsed = (datetime.now() - start_time).total_seconds()
+                self.logger.info(f"\nCapture stopped by user after {packet_count} packets in {elapsed:.1f} seconds")
+                self.logger.info(f"Capture saved to: {capture_file}")
+        
+            finally:
+                try:
+                    capture.close()
+                except Exception as e:
+                    self.logger.debug(f"Error closing capture: {e}")
+    
         except Exception as e:
-            self.handle_error("capture", str(e))
-        finally:
-            capture.close()
+            self.logger.error(f"Error during packet capture: {e}")
+            if 'capture' in locals():
+                try:
+                    capture.close()
+                except:
+                    pass
 
     def analyze_share_type(self, path):
         if path.startswith('\\\\'):
@@ -1095,17 +1106,18 @@ class ShareAnalyzer:
 
 def download_manuf_file():
     """Download Wireshark manufacturer database"""
-    manuf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manuf")
-    if not os.path.exists(manuf_path):
-        try:
-            url = "https://gitlab.com/wireshark/wireshark/-/raw/master/manuf"
-            response = requests.get(url)
-            response.raise_for_status()
-            with open(manuf_path, 'wb') as f:
-                f.write(response.content)
-            logging.info("Downloaded Wireshark manufacturer database")
-        except Exception as e:
-            logging.warning(f"Failed to download manufacturer database: {e}")
+    try:
+        import requests
+        manuf_url = "https://raw.githubusercontent.com/wireshark/wireshark/master/manuf"
+        response = requests.get(manuf_url)
+        if response.status_code == 200:
+            manuf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manuf")
+            with open(manuf_path, "w", encoding="utf-8") as f:
+                f.write(response.text)
+            return True
+    except Exception as e:
+        logging.warning(f"Failed to download manufacturer database: {e}")
+        return False
 
 def get_platform_info():
     """Get platform-specific information and commands"""
