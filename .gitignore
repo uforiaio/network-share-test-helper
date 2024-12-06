@@ -81,6 +81,7 @@ htmlcov/
 docs/_build/
 docs/_static/
 docs/_templates/
+RESOURCE_MANAGEMENT.md
 
 # OS
 .DS_Store

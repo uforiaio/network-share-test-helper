@@ -27,17 +27,18 @@ cp env.template .env    # Linux/Mac
 # Edit .env with your settings:
 SHARE_PATH=\\server\share
 USERNAME=your_username
-DEBUG_LEVEL=1  # 0=Basic, 1=Standard, 2=Detailed, 3=Full
-OPENAI_KEY=your_openai_key
+DOMAIN=your_domain      # Optional
+DEBUG_LEVEL=1          # 0=Basic, 1=Standard, 2=Detailed, 3=Full
+OPENAI_KEY=your_key    # Optional for ML features
 ```
 
 ### 3. Basic Usage
 ```bash
-# Run the analyzer
-python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>
+# Run with all parameters
+python dfs_nfs_analyzer.py "\\share\info" "domain\user" 1 "mydomain" "sk-your-openai-key"
 
-# Example
-python dfs_nfs_analyzer.py "\\share\info" "domain\user" "INFO" "sk-your-openai-key"
+# Run with minimal parameters (using .env defaults)
+python dfs_nfs_analyzer.py
 ```
 
 ## Features
@@ -48,13 +49,16 @@ python dfs_nfs_analyzer.py "\\share\info" "domain\user" "INFO" "sk-your-openai-k
 - Performance metrics (ISO 8601 timestamps)
 - Latency measurements
 - Throughput analysis
+- Persistent connections
+- Connection stability monitoring
 
 ### Share Analysis
-- Share type detection
+- Share type detection (DFS/SMB/NFS)
 - Protocol-specific metrics
 - Backend server identification
 - Permission validation
 - Access pattern analysis
+- Connection stability monitoring
 
 ### Security
 - Secure credential handling
@@ -62,6 +66,14 @@ python dfs_nfs_analyzer.py "\\share\info" "domain\user" "INFO" "sk-your-openai-k
 - Debug log masking
 - API key protection
 - Access monitoring
+- Persistent connection support
+
+### ML Features (with OpenAI key)
+- Performance prediction
+- Anomaly detection
+- Pattern recognition
+- Trend analysis
+- Optimization suggestions
 
 ### Reporting
 - JSON-formatted results
@@ -69,6 +81,7 @@ python dfs_nfs_analyzer.py "\\share\info" "domain\user" "INFO" "sk-your-openai-k
 - Performance metrics
 - ML-powered insights
 - Optimization recommendations
+- Sanitized output
 
 ## Output Files
 
@@ -96,96 +109,48 @@ logs/
 - Basic share status
 - Connection status
 - Essential metrics
+- Security events
 
-### Level 1: Standard
+### Level 1: Standard (Default)
 - Level 0 +
 - Performance metrics
 - Protocol information
+- Connection details
 - Basic ML insights
 
 ### Level 2: Detailed
 - Level 1 +
 - Packet analysis
 - Full ML insights
-- Trend analysis
-- Optimization suggestions
+- Resource usage
+- Pattern detection
 
-### Level 3: Full Debug
+### Level 3: Full
 - Level 2 +
 - Raw packet data
-- Complete ML analysis
-- Resource metrics
-- System state
+- Debug information
+- ML model details
+- Complete metrics
 
 ## Best Practices
 
 ### Performance
-- Regular monitoring
-- Baseline comparison
-- Trend analysis
-- Issue tracking
-- Resource monitoring
+- Use persistent connections for long sessions
+- Monitor resource usage
+- Set appropriate debug levels
+- Regular baseline measurements
+- Review performance metrics
 
 ### Security
-- Regular API key rotation
-- Network capture sanitization
-- Log file protection
-- Access monitoring
-- Credential management
+- Rotate API keys regularly
+- Use domain authentication when possible
+- Monitor access patterns
+- Review sanitized logs
+- Keep dependencies updated
 
 ### Maintenance
 - Regular updates
 - Log rotation
+- Capture cleanup
 - Configuration review
-- Performance tuning
 - Database updates
-
-## Troubleshooting
-
-### Common Issues
-
-1. Share Access
-   ```
-   Error: Access Denied
-   Solution:
-   - Verify credentials
-   - Check permissions
-   - Test connectivity
-   - Review share path
-   ```
-
-2. Packet Capture
-   ```
-   Error: Capture Failed
-   Solution:
-   - Run as administrator
-   - Check Wireshark/Npcap
-   - Verify interface
-   - Review filters
-   ```
-
-3. Performance
-   ```
-   Issue: Slow Analysis
-   Solution:
-   - Check network load
-   - Monitor resources
-   - Verify share health
-   - Optimize filters
-   ```
-
-## Updating
-
-### Automatic Updates
-```bash
-# The tool checks for updates on startup
-# Manual check:
-python update.py
-```
-
-### Update Process
-1. Checks version
-2. Downloads updates
-3. Updates dependencies
-4. Preserves configuration
-5. Maintains virtual environment

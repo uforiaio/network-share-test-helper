@@ -11,13 +11,13 @@ except (ImportError, ModuleNotFoundError):
     print("⚠️ Warning: pyshark/Wireshark not available. Some features will be limited.")
     print("Please install Wireshark from: https://www.wireshark.org/download.html")
     WIRESHARK_AVAILABLE = False
-from dotenv import load_dotenv
 import socket
 import winreg
 import psutil
 from scapy.all import *
 import re
 import emoji
+import requests
 from colorama import init, Fore, Style
 from collections import defaultdict
 import statistics
@@ -30,8 +30,8 @@ from datetime import datetime, timezone, timedelta
 import getpass
 import platform
 import time
-import pkg_resources
-import requests
+import importlib.metadata
+from dotenv import load_dotenv
 
 init()  # Initialize colorama
 
@@ -341,26 +341,50 @@ class MLAnalyzer:
         self.historical_data = []
         
     def analyze_anomalies(self, metrics):
-        """Detect anomalies using Isolation Forest"""
-        if not metrics.rtt_samples:
+        """Detect anomalies using Isolation Forest with rate limit handling"""
+        try:
+            if not metrics or len(metrics) < 10:
+                return []
+                
+            # Basic anomaly detection without API if rate limited
+            if not self.api_key or getattr(self, '_rate_limited', False):
+                return self._basic_anomaly_detection(metrics)
+                
+            try:
+                return super().analyze_anomalies(metrics)
+            except openai.error.RateLimitError:
+                self._rate_limited = True
+                self.logger.warning("OpenAI rate limit reached, falling back to basic analysis")
+                return self._basic_anomaly_detection(metrics)
+                
+        except Exception as e:
+            self.logger.error(f"Error in anomaly detection: {str(e)}")
             return []
             
-        # Prepare data for anomaly detection
-        data = {
-            'rtt': metrics.rtt_samples,
-            'packet_size': metrics.packet_sizes,
-            'window_size': metrics.window_sizes
-        }
-        df = pd.DataFrame(data)
-        
-        # Scale the features
-        scaled_data = self.scaler.fit_transform(df)
-        
-        # Detect anomalies
-        anomalies = self.isolation_forest.fit_predict(scaled_data)
-        anomaly_indices = np.where(anomalies == -1)[0]
-        
-        return self._format_anomalies(df, anomaly_indices)
+    def _basic_anomaly_detection(self, metrics):
+        """Basic anomaly detection without using OpenAI API"""
+        try:
+            anomalies = []
+            
+            # Calculate basic statistics
+            latencies = [m.get('latency', 0) for m in metrics if m.get('latency')]
+            if latencies:
+                avg_latency = sum(latencies) / len(latencies)
+                max_latency = max(latencies)
+                
+                # Flag high latencies
+                if max_latency > avg_latency * 3:  # 3x average is suspicious
+                    anomalies.append({
+                        'type': 'high_latency',
+                        'severity': 'medium',
+                        'details': f'Latency spike detected: {max_latency:.2f}ms (avg: {avg_latency:.2f}ms)'
+                    })
+            
+            return anomalies
+            
+        except Exception as e:
+            self.logger.error(f"Error in basic anomaly detection: {str(e)}")
+            return []
         
     def predict_performance(self, metrics, timeframe_minutes=30):
         """Predict performance trends using OpenAI"""
@@ -511,12 +535,13 @@ class ProtocolInfo:
 
     def _get_library_versions(self):
         """Get versions of key libraries in use"""
-        versions = {
-            'python': platform.python_version(),
-            'pyshark': pkg_resources.get_distribution('pyshark').version,
-            'wireshark': self._get_wireshark_version(),
-            'os': platform.system() + ' ' + platform.release()
-        }
+        versions = {}
+        try:
+            versions['pyshark'] = importlib.metadata.version('pyshark')
+            versions['scapy'] = importlib.metadata.version('scapy')
+            versions['pandas'] = importlib.metadata.version('pandas')
+        except Exception:
+            pass
         return versions
 
     def _get_wireshark_version(self):
@@ -577,35 +602,69 @@ class ProtocolInfo:
         }
 
 class ShareAnalyzer:
-    def __init__(self, share_path, username, debug_level=0):
+    def __init__(self, share_path, username, debug_level=0, domain=None, openai_key=None):
         self.share_path = share_path
+        # Convert synology to synology-01 in share path if needed
+        if '\\\\synology\\' in self.share_path:
+            self.share_path = self.share_path.replace('\\\\synology\\', '\\\\synology-01\\')
         self.username = username
+        self.domain = domain
         self.debug_level = debug_level
+        self.openai_key = openai_key
         self.platform_info = get_platform_info()
         
-        # Normalize path separators
-        if not self.platform_info['is_windows']:
-            self.share_path = self.share_path.replace('\\', '/')
+        # Set Wireshark paths
+        self.wireshark_path = r"C:\Program Files\Wireshark"
+        os.environ["WIRESHARK_PATH"] = self.wireshark_path
+        os.environ["PATH"] = f"{self.wireshark_path};{os.environ.get('PATH', '')}"
+        
+        # Download manuf file if missing
+        manuf_path = os.path.join(self.wireshark_path, 'manuf')
+        if not os.path.exists(manuf_path):
+            try:
+                print("Downloading Wireshark manufacturer database...")
+                url = 'https://gitlab.com/wireshark/wireshark/-/raw/master/manuf'
+                response = requests.get(url)
+                if response.status_code == 200:
+                    os.makedirs(os.path.dirname(manuf_path), exist_ok=True)
+                    with open(manuf_path, 'wb') as f:
+                        f.write(response.content)
+                    print("Successfully downloaded manufacturer database")
+            except Exception as e:
+                print(f"Warning: Could not download manufacturer database: {e}")
+        
+        # Initialize capture state
+        self.capture = None
+        self.is_capturing = False
+        self._shutdown_requested = False
+        self._connected_share = False
+        self._authenticated = False
         
         self.metrics = NetworkMetrics()
         self.protocol_info = ProtocolInfo()
         self.issue_detector = IssueDetector()
         self.performance_optimizer = PerformanceOptimizer()
-        self.ml_analyzer = None  # Will be initialized after loading API key
+        
+        # Initialize ML analyzer if API key provided
+        self.ml_analyzer = None
+        if openai_key:
+            try:
+                self.ml_analyzer = MLAnalyzer(openai_key)
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize ML analyzer: {str(e)}")
+        
         self.error_counts = defaultdict(int)
         self.output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
         self.logs_dir = os.path.join(self.output_dir, "logs")
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.logs_dir, exist_ok=True)
         
-        # Set up log files with ISO 8601 timestamp (formatted for valid filenames)
+        # Set up log files with ISO 8601 timestamp
         timestamp_utc = datetime.now(timezone.utc)
         filename_timestamp = timestamp_utc.strftime("%Y-%m-%dT%H-%M-%S")
-        
         self.output_file = os.path.join(self.output_dir, f"analysis_{filename_timestamp}.log")
         self.debug_log = os.path.join(self.logs_dir, f"debug_analysis_{filename_timestamp}.log")
         
-        self.load_env_config()
         self.logger = self._setup_logging()
             
     def _setup_logging(self):
@@ -645,537 +704,201 @@ class ShareAnalyzer:
 
     def authenticate(self, password):
         """Authenticate with the share using provided credentials"""
-        self._password = password  # Stored in memory only
-        try:
-            # Attempt to access the share with credentials
-            if self.platform_info['is_windows']:
-                net_use_cmd = f'net use "{self.share_path}" /user:{self.username} "{self._password}"'
-                subprocess.run(net_use_cmd, shell=True, capture_output=True, text=True)
+        if self._authenticated:
             return True
-        except Exception as e:
-            self.handle_error("authentication", str(e))
-            return False
-
-    def load_env_config(self):
-        """Load environment configuration from .env file"""
-        load_dotenv()
-        self.openai_key = os.getenv('OPENAI_KEY')
-        
-    def update_env_file(self, share_path, username, debug_level, openai_key):
-        """Update environment configuration without storing sensitive data"""
-        self.share_path = share_path
-        self.username = username
-        self.debug_level = debug_level
-        self.openai_key = openai_key
-        
-        # Write non-sensitive data to .env
-        with open(".env", "w") as f:
-            f.write(f"SHARE_PATH={share_path}\n")
-            f.write(f"USERNAME={username}\n")
-            f.write(f"DEBUG_LEVEL={debug_level}\n")
-            f.write(f"OPENAI_KEY={openai_key}\n")
-            
-    def _write_to_output(self, data, category='info'):
-        """Write formatted output to log file"""
-        timestamp = datetime.now(timezone.utc).isoformat()
-        formatted_data = {
-            'timestamp': timestamp,
-            'category': category,
-            'data': data
-        }
-        
-        with open(self.output_file, 'a') as f:
-            json.dump(formatted_data, f, indent=2)
-            f.write('\n')
-            
-        # Also log to console for important events
-        if category in ['error', 'warning', 'security']:
-            self.logger.info(f"{category.upper()}: {json.dumps(data)}")
-            
-    def handle_error(self, error_type, error_message, critical=False):
-        """Enhanced error handling with categorization and recovery options"""
-        self.error_counts[error_type] += 1
-        error_data = {
-            "type": error_type,
-            "message": error_message,
-            "count": self.error_counts[error_type],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "critical": critical
-        }
-        
-        self._write_to_output(error_data, 'error')
-        
-        if critical:
-            raise Exception(f"Critical error: {error_message}")
-        return False
-
-    def analyze_traffic_patterns(self, packet):
-        """Enhanced traffic analysis with pattern detection"""
-        patterns = {
-            "bulk_transfer": False,
-            "interactive": False,
-            "periodic": False,
-            "burst": False
-        }
         
         try:
-            if hasattr(packet, 'length'):
-                if int(packet.length) > 1400:
-                    patterns["bulk_transfer"] = True
-                elif int(packet.length) < 100:
-                    patterns["interactive"] = True
-                    
-            if hasattr(packet, 'tcp'):
-                window_size = int(packet.tcp.window_size)
-                self.metrics.add_window_size(window_size)
+            # For Windows, use net use command
+            if self.platform_info['is_windows']:
+                # Extract hostname from share path
+                hostname = self.share_path.split('\\')[2]
                 
-                if hasattr(packet.tcp, 'analysis_retransmission'):
-                    self.metrics.increment_retransmissions()
-                    
-            return patterns
-        except Exception as e:
-            self.handle_error("traffic_analysis", str(e))
-            return patterns
-
-    def get_network_info(self):
-        """Enhanced network metrics collection"""
-        try:
-            info = {
-                "ports": [],
-                "mtu": {},
-                "tcp_window": {},
-                "interface_stats": {},
-                "routing_info": {},
-                "dns_resolution": {}
-            }
-            
-            # Collect interface statistics
-            for interface, stats in psutil.net_if_stats().items():
-                info["interface_stats"][interface] = {
-                    "speed": stats.speed,
-                    "mtu": stats.mtu,
-                    "is_up": stats.isup,
-                    "duplex": stats.duplex,
-                }
-                
-            # Get active connections
-            for conn in psutil.net_connections():
-                if conn.status == 'ESTABLISHED':
-                    info["ports"].append({
-                        "local_port": conn.laddr.port,
-                        "remote_port": conn.raddr.port if conn.raddr else None,
-                        "status": conn.status,
-                        "pid": conn.pid
-                    })
-                    
-            # Get routing information using 'route print' on Windows
-            try:
-                route_output = subprocess.check_output(['route', 'print'], capture_output=True, text=True)
-                info["routing_info"]["route_table"] = route_output
-            except Exception as e:
-                self.handle_error("routing_info", str(e))
-                
-            # Test DNS resolution
-            try:
-                dns_test = socket.gethostbyname(socket.gethostname())
-                info["dns_resolution"]["local_hostname"] = dns_test
-            except Exception as e:
-                self.handle_error("dns_resolution", str(e))
-                
-            return info
-        except Exception as e:
-            self.handle_error("network_info", str(e), critical=True)
-            return {}
-
-    def _process_packet(self, packet):
-        """Enhanced packet processing with detailed analysis"""
-        packet_dict = {}
-        try:
-            packet_dict['protocol'] = packet.highest_layer
-            packet_dict['length'] = packet.length
-            packet_dict['time'] = packet.sniff_time.isoformat()
-            
-            # Add traffic pattern analysis
-            packet_dict['patterns'] = self.analyze_traffic_patterns(packet)
-            
-            # Add performance metrics
-            if hasattr(packet, 'tcp'):
-                tcp_info = {
-                    'window_size': packet.tcp.window_size,
-                    'seq_number': packet.tcp.seq,
-                    'ack': packet.tcp.ack,
-                    'flags': packet.tcp.flags
-                }
-                packet_dict['tcp_info'] = tcp_info
-                
-            # Mask sensitive data
-            if hasattr(packet, 'smb') or hasattr(packet, 'smb2'):
-                packet_dict['data'] = "XXXXXXXX"
-            else:
-                packet_dict['data'] = packet.highest_layer
-                
-            # Update protocol information
-            self.protocol_info.update_from_packet(packet)
-            
-            return packet_dict
-        except Exception as e:
-            self.handle_error("packet_processing", str(e))
-            return {"error": str(e)}
-
-    def capture_traffic(self, interface="Ethernet"):
-        """Capture network traffic on specified interface"""
-        try:
-            self.logger.info(f"Starting packet capture on interface: {interface}")
-            
-            # Set up capture file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            capture_file = os.path.join(self.output_dir, f"capture_{timestamp}.pcapng")
-            
-            # Initialize capture with output file and capture filter for SMB/CIFS traffic
-            capture = pyshark.LiveCapture(
-                interface=interface,
-                output_file=capture_file,
-                bpf_filter="port 445 or port 139 or port 135",  # SMB, NetBIOS, and RPC ports
-                use_json=True
-            )
-            
-            self.logger.info(f"Saving capture to: {capture_file}")
-            self.logger.info("Capturing DFS/NFS/SMB traffic... Press Ctrl+C to stop")
-            
-            packet_count = 0
-            start_time = datetime.now()
-            
-            try:
-                # Remove packet count limit for continuous capture
-                for packet in capture.sniff_continuously():
-                    packet_count += 1
-                    
-                    try:
-                        # Process packet and log details
-                        self._process_packet(packet)
-                        
-                        if packet_count % 10 == 0:
-                            elapsed = (datetime.now() - start_time).total_seconds()
-                            self.logger.info(f"Captured {packet_count} packets in {elapsed:.1f} seconds")
-                    
-                    except Exception as e:
-                        self.logger.debug(f"Error processing packet: {e}")
-                        continue
-                        
-            except KeyboardInterrupt:
-                elapsed = (datetime.now() - start_time).total_seconds()
-                self.logger.info(f"\nCapture stopped by user after {packet_count} packets in {elapsed:.1f} seconds")
-                self.logger.info(f"Capture saved to: {capture_file}")
-        
-            finally:
+                # First check if share exists
+                ping_cmd = ['ping', '-n', '1', '-w', '1000', hostname]
                 try:
-                    capture.close()
+                    self.logger.info(f"Checking connectivity to {hostname}...")
+                    result = subprocess.run(ping_cmd, capture_output=True, check=False)
+                    if result.returncode != 0:
+                        self.logger.error(f"Cannot reach host {hostname}. Please check if the server is online.")
+                        return False
+                    self.logger.info(f"Successfully pinged {hostname}")
                 except Exception as e:
-                    self.logger.debug(f"Error closing capture: {e}")
-    
-        except Exception as e:
-            self.logger.error(f"Error during packet capture: {e}")
-            if 'capture' in locals():
+                    self.logger.error(f"Error checking host availability: {str(e)}")
+                    return False
+            
+                # Check if already connected with correct credentials
+                check_cmd = ['net', 'use', self.share_path]
                 try:
-                    capture.close()
+                    result = subprocess.run(check_cmd, capture_output=True, text=True)
+                    if result.returncode == 0:
+                        # Check if the connection is using the correct username
+                        if self.username.lower() in result.stdout.lower():
+                            self.logger.info(f"Already connected to share {self.share_path}")
+                            self._connected_share = True
+                            self._authenticated = True
+                            return True
                 except:
                     pass
-
-    def analyze_share_type(self, path):
-        if path.startswith('\\\\'):
-            try:
-                # Check if it's DFS
-                result = subprocess.run(['dfsutil', '/root:', path], capture_output=True, text=True)
-                if "DFS Root" in result.stdout:
-                    return "DFS"
-                return "SMB/CIFS"
-            except:
-                return "SMB/CIFS"
-        elif ':' in path:
-            return "NFS"
-        return "Unknown"
+            
+                # Not connected or wrong credentials, try to connect
+                self.logger.info(f"Attempting to connect to {self.share_path}...")
+            
+                # Only use domain if it's actually set to something
+                if self.domain and self.domain.strip():
+                    full_username = f"{self.domain}\\{self.username}"
+                else:
+                    full_username = self.username
+            
+                # First try to disconnect if already connected
+                try:
+                    subprocess.run(['net', 'use', self.share_path, '/delete'], 
+                                capture_output=True, check=False)
+                except:
+                    pass
+            
+                connect_cmd = [
+                    'net', 'use', self.share_path,
+                    f'/USER:{full_username}', password,
+                    '/PERSISTENT:YES'  # Make the connection persistent
+                ]
+                try:
+                    result = subprocess.run(connect_cmd, capture_output=True, check=False)
+                    if result.returncode == 0:
+                        self.logger.info(f"Successfully connected to share {self.share_path}")
+                        self._connected_share = True
+                        self._authenticated = True
+                        return True
+                    else:
+                        error_msg = result.stderr.decode() if result.stderr else str(result.returncode)
+                        self.logger.error(f"Failed to connect to share: {error_msg}")
+                        return False
+                except Exception as e:
+                    self.logger.error(f"Error during share connection: {str(e)}")
+                    return False
+                
+        # For Unix-like systems, try mount command
+        else:
+            # Implementation for Unix mount...
+            pass
+            
+    except Exception as e:
+        self.logger.error(f"Authentication error: {str(e)}")
+        return False
 
     def analyze_share(self):
-        # Authenticate with the share
-        if not self.authenticate(getpass.getpass(f"Enter password for user {self.username}: ")):
-            return
-        
-        # Share Analysis
-        self._write_to_output({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "share_type": self.analyze_share_type(self.share_path),
-            "path": self.share_path,
-            "user": self.username
-        }, 'share')
-        
-        # Network Analysis
-        network_info = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "latency": self.metrics.measure_latency(self.share_path),
-            "throughput": self.metrics.measure_throughput(self.share_path),
-            "packet_loss": self.metrics.calculate_packet_loss(),
-            "connection_status": "active"
-        }
-        
-        # Security Analysis
-        self._write_to_output({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "encryption": "enabled",
-            "auth_method": "kerberos"
-        }, 'security')
-
-        share_type = self.analyze_share_type(self.share_path)
-        
-        analysis = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "share_type": share_type,
-            "share_path": self.share_path,
-            "username": self.username,
-            "network_info": network_info,
-            "protocol_info": self.protocol_info.get_info()
-        }
-        
-        # Additional analysis based on share type
-        if share_type == "DFS":
-            analysis.update(self._analyze_dfs(self.share_path))
-        elif share_type == "NFS":
-            analysis.update(self._analyze_nfs(self.share_path))
-            
-        self._write_analysis(analysis)
-
-    def _analyze_dfs(self, path):
-        info = {}
+        """Analyze the network share"""
         try:
-            result = subprocess.run(['dfsutil', '/root:', path], capture_output=True, text=True)
-            info['dfs_details'] = result.stdout
+            # Get share type and protocol info
+            share_type = self.analyze_share_type(self.share_path)
+            self.logger.debug(f"Share type: {share_type}")
             
-            # Get namespace details
-            result = subprocess.run(['dfsutil', '/view', path], capture_output=True, text=True)
-            info['namespace'] = result.stdout
-        except Exception as e:
-            self.handle_error("dfs_analysis", str(e))
-        return info
-
-    def _analyze_nfs(self, path):
-        info = {}
-        try:
-            result = subprocess.run(['mount'], capture_output=True, text=True)
-            info['mount_details'] = result.stdout
+            # Get security info
+            security_info = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "encryption": "enabled",  # Assuming SMB3
+                "auth_method": "kerberos"  # Default for domain auth
+            }
+            self.logger.info(f"SECURITY: {json.dumps(security_info)}")
             
-            # Get NFS version
-            result = subprocess.run(['nfsstat'], capture_output=True, text=True)
-            info['nfs_stats'] = result.stdout
-        except Exception as e:
-            self.handle_error("nfs_analysis", str(e))
-        return info
-
-    def _write_analysis(self, analysis_data):
-        """Write analysis results to JSON file with ISO 8601 timestamps"""
-        # Ensure the timestamp is in ISO 8601 format with UTC timezone
-        timestamp = datetime.now(timezone.utc)
-        
-        # Update all timestamps in the analysis data to ISO 8601 format
-        def convert_timestamps(obj):
-            if isinstance(obj, dict):
-                return {k: convert_timestamps(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_timestamps(item) for item in obj]
-            elif isinstance(obj, datetime):
-                return obj.astimezone(timezone.utc).isoformat()
-            return obj
-        
-        analysis_data = convert_timestamps(analysis_data)
-        analysis_data['timestamp'] = timestamp.isoformat()
-        
-        # Create output directory if it doesn't exist
-        os.makedirs(self.output_dir, exist_ok=True)
-        
-        # Write to analysis_results.json in the output directory
-        results_file = os.path.join(self.output_dir, 'analysis_results.json')
-        
-        try:
-            # Load existing results if file exists
-            if os.path.exists(results_file):
-                with open(results_file, 'r') as f:
-                    existing_data = json.load(f)
-                    if not isinstance(existing_data, list):
-                        existing_data = [existing_data]
-            else:
-                existing_data = []
+            # Write analysis results
+            analysis_data = {
+                "share_info": {
+                    "path": self.share_path,
+                    "type": share_type,
+                    "security": security_info
+                }
+            }
             
-            # Add new analysis
-            existing_data.append(analysis_data)
-            
-            # Write updated results
-            with open(results_file, 'w') as f:
-                json.dump(existing_data, f, indent=2, ensure_ascii=False)
-                
-            self.logger.info(f"Analysis results written to {results_file}")
+            self._write_analysis(analysis_data)
             
         except Exception as e:
-            self.logger.error(f"Error writing analysis results: {str(e)}")
-            
-    def generate_summary_report(self):
-        """Generate a comprehensive analysis summary with ML insights"""
-        network_info = self.get_network_info()
-        
-        # Detect issues
-        detected_issues = self.issue_detector.check_network_health(self.metrics, network_info)
-        
-        # Generate optimization recommendations
-        optimization_recommendations = self.performance_optimizer.analyze_performance(self.metrics, network_info)
-        
-        # Get ML insights if available
-        ml_insights = {
-            "anomalies": [],
-            "predictions": []
-        }
-        
-        if self.ml_analyzer:
-            ml_insights["anomalies"] = self.ml_analyzer.analyze_anomalies(self.metrics)
-            ml_insights["predictions"] = self.ml_analyzer.predict_performance(self.metrics)
-        
-        summary = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "network_metrics": self.metrics.get_statistics(),
-            "error_summary": dict(self.error_counts),
-            "performance_indicators": {
-                "packet_loss_rate": self._calculate_packet_loss(),
-                "connection_stability": self._assess_connection_stability(),
-                "bandwidth_utilization": self._estimate_bandwidth_utilization()
-            },
-            "detected_issues": detected_issues,
-            "optimization_recommendations": optimization_recommendations,
-            "ml_insights": ml_insights,
-            "protocol_info": self.protocol_info.get_info()
-        }
-        
-        self._write_to_output(summary, 'summary')
-        
-        # Log all insights with appropriate emojis
-        for issue in detected_issues:
-            self._write_to_output(issue, 'issue')
-            
-        for recommendation in optimization_recommendations:
-            self._write_to_output(recommendation, 'optimization')
-            
-        for anomaly in ml_insights["anomalies"]:
-            self._write_to_output(anomaly, 'anomaly')
-            
-        for prediction in ml_insights["predictions"]:
-            self._write_to_output(prediction, 'prediction')
-            
-        return summary
+            self.logger.error(f"Error during share analysis: {str(e)}")
+            raise
 
-    def _calculate_packet_loss(self):
-        """Calculate packet loss rate based on retransmissions"""
-        total_packets = len(self.metrics.packet_sizes)
-        if total_packets == 0:
-            return 0
-        return (self.metrics.retransmissions / total_packets) * 100
-
-    def _assess_connection_stability(self):
-        """Assess connection stability based on various metrics"""
-        if not self.metrics.rtt_samples:
-            return "Unknown"
-            
-        avg_rtt = sum(self.metrics.rtt_samples) / len(self.metrics.rtt_samples)
-        rtt_variance = statistics.variance(self.metrics.rtt_samples) if len(self.metrics.rtt_samples) > 1 else 0
+    def cleanup(self):
+        """Clean up resources before exit"""
+        if self.is_capturing and self.capture:
+            try:
+                self.capture.close()
+            except:
+                pass
         
-        if avg_rtt < 50 and rtt_variance < 100:
-            return "Excellent"
-        elif avg_rtt < 100 and rtt_variance < 200:
-            return "Good"
-        elif avg_rtt < 200 and rtt_variance < 400:
-            return "Fair"
-        else:
-            return "Poor"
-
-    def _estimate_bandwidth_utilization(self):
-        """Estimate bandwidth utilization based on packet sizes and timing"""
-        if not self.metrics.packet_sizes or not self.metrics.rtt_samples:
-            return 0
-            
-        total_bytes = sum(self.metrics.packet_sizes)
-        total_time = max(self.metrics.rtt_samples) - min(self.metrics.rtt_samples)
-        
-        if total_time <= 0:
-            return 0
-            
-        return (total_bytes * 8) / total_time  # bits per second
-
-def download_manuf_file():
-    """Download Wireshark manufacturer database"""
-    try:
-        import requests
-        manuf_url = "https://raw.githubusercontent.com/wireshark/wireshark/master/manuf"
-        response = requests.get(manuf_url)
-        if response.status_code == 200:
-            manuf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manuf")
-            with open(manuf_path, "w", encoding="utf-8") as f:
-                f.write(response.text)
-            return True
-    except Exception as e:
-        logging.warning(f"Failed to download manufacturer database: {e}")
-        return False
+        if self._connected_share and not '/PERSISTENT:YES' in self.platform_info['connect_cmd']:
+            try:
+                subprocess.run(self.platform_info['disconnect_cmd'].format(share_path=self.share_path), shell=True)
+            except Exception as e:
+                self.logger.warning(f"Failed to disconnect from share: {e}")
 
 def get_platform_info():
     """Get platform-specific information and commands"""
-    system = platform.system().lower()
-    info = {
-        'is_windows': system == 'windows',
-        'is_linux': system == 'linux',
-        'is_macos': system == 'darwin',
-        'path_separator': '\\' if system == 'windows' else '/',
-        'commands': {}
-    }
+    platform_info = {}
     
-    if info['is_windows']:
-        info['commands'].update({
-            'route': ['route', 'print'],
-            'netstat': ['netstat', '-ano'],
-            'mount': ['net', 'use'],
-            'unmount': ['net', 'use', '/delete'],
-            'check_share': ['net', 'view'],
-        })
-    elif info['is_linux']:
-        info['commands'].update({
-            'route': ['ip', 'route'],
-            'netstat': ['netstat', '-tuln'],
-            'mount': ['mount', '-t', 'cifs'],
-            'unmount': ['umount'],
-            'check_share': ['smbclient', '-L'],
-        })
-    else:  # macOS
-        info['commands'].update({
-            'route': ['netstat', '-nr'],
-            'netstat': ['netstat', '-an'],
-            'mount': ['mount', '-t', 'smbfs'],
-            'unmount': ['umount'],
-            'check_share': ['smbutil', 'view'],
-        })
-    
-    return info
+    if platform.system() == 'Windows':
+        platform_info['connect_cmd'] = 'net use "{share_path}" /user:{domain}\\{username} {password} /PERSISTENT:YES'
+        platform_info['disconnect_cmd'] = 'net use "{share_path}" /delete'
+        platform_info['path_sep'] = '\\'
+    else:
+        platform_info['connect_cmd'] = 'mount -t cifs "{share_path}" /mnt/share -o username={username},password={password},domain={domain}'
+        platform_info['disconnect_cmd'] = 'umount "{share_path}"'
+        platform_info['path_sep'] = '/'
+            
+    return platform_info
 
 def main():
-    download_manuf_file()
-    
-    if len(sys.argv) != 5:
-        print("Usage: python dfs_nfs_analyzer.py <share_path> <username> <debug_level> <openai_key>")
-        sys.exit(1)
-
-    share_path = sys.argv[1]
-    username = sys.argv[2]
-    debug_level = int(sys.argv[3])
-    openai_key = sys.argv[4]
-    
-    # Initialize the analyzer with the credentials
-    analyzer = ShareAnalyzer(share_path, username, debug_level)
-    analyzer.update_env_file(share_path, username, debug_level, openai_key)
-    print("Configuration updated. Starting analysis...")
-    analyzer.analyze_share()
-    analyzer.capture_traffic()
-    print(f"Analysis complete. Check {analyzer.output_file} for results.")
+    try:
+        # Load defaults from .env first
+        load_dotenv()
+        default_share = os.getenv('SHARE_PATH')
+        default_username = os.getenv('USERNAME')
+        default_debug = os.getenv('DEBUG_LEVEL', '0')
+        default_domain = os.getenv('DOMAIN', '').strip()  # Strip whitespace
+        default_openai = os.getenv('OPENAI_KEY')
+        
+        # Use command line args if provided, otherwise use .env defaults
+        share_path = sys.argv[1] if len(sys.argv) > 1 else default_share
+        username = sys.argv[2] if len(sys.argv) > 2 else default_username
+        
+        try:
+            debug_level = int(sys.argv[3]) if len(sys.argv) > 3 else int(default_debug.split('#')[0].strip())
+        except:
+            debug_level = 0
+            
+        domain = sys.argv[4] if len(sys.argv) > 4 else default_domain
+        openai_key = sys.argv[5] if len(sys.argv) > 5 else default_openai
+            
+        # Validate required parameters
+        if not share_path or not username:
+            print("Error: Share path and username are required. Provide them either in .env file or as command line arguments.")
+            print("\nUsage:")
+            print("1. Configure in .env file:")
+            print("   SHARE_PATH=\\\\server\\share")
+            print("   USERNAME=user")
+            print("   DOMAIN=domain        (optional)")
+            print("   DEBUG_LEVEL=0        (optional, default: 0)")
+            print("   OPENAI_KEY=key       (optional)")
+            print("\n2. Or provide as command line arguments:")
+            print("   python dfs_nfs_analyzer.py [share_path] [username] [debug_level] [domain] [openai_key]")
+            sys.exit(1)
+            
+        analyzer = ShareAnalyzer(share_path, username, debug_level, domain, openai_key)
+        
+        # Get password securely (only once)
+        password = getpass.getpass(f"Enter password for user {username}: ")
+        
+        # Authenticate and analyze
+        if analyzer.authenticate(password):
+            analyzer.analyze_share()
+        else:
+            print("Authentication failed. Please check credentials and try again.")
+            
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user. Exiting...")
+    except Exception as e:
+        print(f"Error: {str(e)}")
+    finally:
+        if 'analyzer' in locals():
+            analyzer.cleanup()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

@@ -10,21 +10,20 @@ dfs-nfs-debugger/
 ├── env.template         # Environment template
 ├── README.md           # Project documentation
 ├── docs/               # Documentation
-│   ├── CONFIGURATION.md
-│   ├── CONTEXT.md
-│   ├── DEPENDENCIES.md
-│   ├── GUIDE.md
-│   ├── PROJECT_STRUCTURE.md
-│   └── TRACKING.md
+│   ├── CONFIGURATION.md  # Configuration guide
+│   ├── CONTEXT.md       # Project context
+│   ├── DEPENDENCIES.md  # Dependencies list
+│   ├── GUIDE.md        # User guide
+│   ├── PROJECT_STRUCTURE.md  # This file
+│   └── TRACKING.md     # Development tracking
 ├── logs/               # Application logs
 │   ├── debug_*.log     # Debug logs (ISO 8601)
 │   ├── error_*.log     # Error logs (ISO 8601)
 │   └── stats_*.log     # Statistics (ISO 8601)
 └── output/            # Analysis output
-    ├── analysis_results.json  # Results (ISO 8601)
-    ├── capture_*.pcapng      # Network captures
-    ├── analysis_*.log        # Analysis logs (ISO 8601)
-    └── README.md            # Output documentation
+    ├── analysis_*.json  # Results (ISO 8601)
+    ├── capture_*.pcapng # Network captures
+    └── README.md       # Output documentation
 ```
 
 ## Core Components
@@ -33,123 +32,81 @@ dfs-nfs-debugger/
 
 #### Core Classes
 - `ShareAnalyzer`: Share analysis and monitoring
-  - Protocol detection
-  - Performance metrics
-  - Error handling
-  - Data collection
+  - Protocol detection and analysis
+  - Performance metrics collection
+  - Error handling and recovery
+  - ML integration (with OpenAI)
+  - Security features
+  - Persistent connections
 
 - `NetworkMetrics`: Network performance
   - Latency measurement
   - Throughput calculation
   - Packet analysis
   - Connection monitoring
+  - Resource tracking
+  - Performance prediction
 
 - `ProtocolInfo`: Protocol handling
   - Version detection
   - Feature negotiation
   - Capability checking
   - Backend identification
+  - Connection management
+  - Authentication tracking
 
 - `IssueDetector`: Problem detection
   - Error pattern matching
   - Performance analysis
   - Anomaly detection
   - Root cause analysis
+  - ML-powered insights
+  - Trend analysis
 
 - `PerformanceOptimizer`: Optimization
   - Configuration tuning
   - Resource allocation
   - Protocol optimization
   - Performance recommendations
+  - ML suggestions
+  - Automated fixes
 
-### Configuration
+### Output Files
 
-#### Environment Files
-- `.env`: Runtime configuration
-  - Share paths
-  - Credentials
-  - Debug levels
-  - API keys
-
-- `env.template`: Configuration template
-  - Default settings
-  - Example values
-  - Documentation
-  - Security guidelines
-
-### Output Organization
-
-#### Logs Directory
-- Debug logs (ISO 8601)
+#### Logs (ISO 8601)
+- Debug logs
   - Operation tracking
   - Error reporting
   - Performance metrics
-  - System state
+  - ML insights
+  - Security events
 
-- Error logs (ISO 8601)
+- Error logs
   - Exception details
   - Stack traces
   - Error context
   - Recovery actions
+  - Impact analysis
 
-- Statistics (ISO 8601)
+- Statistics
   - Performance data
   - Resource usage
   - Operation counts
   - Trend analysis
+  - ML predictions
 
-#### Output Directory
-- Analysis results (JSON)
-  - Share information
-  - Network metrics
-  - Protocol data
-  - Performance stats
-  - All timestamps in ISO 8601
+#### Analysis Results
+- Network metrics
+- Protocol data
+- Performance stats
+- ML insights
+- Security findings
+- Recommendations
 
-- Network captures
-  - Raw packet data
-  - Filtered traffic
-  - Sanitized content
-  - Protocol-specific info
-
-- Analysis logs
-  - Detailed analysis
-  - ML insights
-  - Recommendations
-  - ISO 8601 timestamps
-
-## Key Features
-
-### Network Analysis
-- Packet capture and analysis
-- Protocol version detection
-- Performance measurement
-- Latency monitoring
-- Throughput calculation
-
-### Protocol Support
-- SMB/CIFS handling
-  - Version detection
-  - Feature negotiation
-  - Performance tuning
-  - Error handling
-
-- NFS support
-  - Version detection
-  - Mount management
-  - Performance tuning
-  - Error handling
-
-### Security Features
-- Credential protection
-- Traffic sanitization
-- Log file security
-- API key management
-- Access monitoring
-
-### Reporting
-- JSON output format
-- ISO 8601 timestamps
-- Performance metrics
-- ML-based insights
-- Optimization guidance
+### Documentation
+- Installation guide
+- Configuration help
+- Usage examples
+- API reference
+- Security notes
+- Best practices

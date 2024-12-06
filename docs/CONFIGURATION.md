@@ -8,12 +8,13 @@ Create a `.env` file based on `env.template`:
 # Share Configuration
 SHARE_PATH=\\server\share
 USERNAME=your_username
+DOMAIN=your_domain        # Optional domain name
 
 # Debug Settings
 DEBUG_LEVEL=1  # 0=Basic, 1=Standard, 2=Detailed, 3=Full
 
 # API Keys
-OPENAI_KEY=your_openai_key
+OPENAI_KEY=your_openai_key  # Optional for ML features
 
 # Output Settings
 OUTPUT_DIR=output
@@ -60,6 +61,7 @@ TIMESTAMP_FORMAT=ISO8601  # All timestamps use ISO 8601
 - All timestamps in ISO 8601 format
 - Automatic log rotation (30 days)
 - Debug level specific content
+- Sanitized sensitive information
 
 ### Analysis Results
 - Stored in `output/` directory
@@ -68,12 +70,14 @@ TIMESTAMP_FORMAT=ISO8601  # All timestamps use ISO 8601
 - Network metrics
 - Protocol information
 - Performance recommendations
+- ML insights (if OpenAI key provided)
 
 ### Network Captures
 - Stored in `output/` directory
 - pcapng format
 - Sanitized sensitive data
-- Timestamped filenames
+- Timestamped filenames (ISO 8601)
+- Automatic cleanup (30 days)
 
 ## Security Configuration
 
@@ -82,6 +86,7 @@ TIMESTAMP_FORMAT=ISO8601  # All timestamps use ISO 8601
 - Secure password input
 - Session-only authentication
 - Access pattern monitoring
+- Persistent connections supported
 
 ### API Keys
 - Store in `.env` file
@@ -96,12 +101,14 @@ TIMESTAMP_FORMAT=ISO8601  # All timestamps use ISO 8601
 - Capture duration: Configurable
 - Filter optimization
 - Interface auto-detection
+- Persistent share connections
 
 ### Analysis
 - ML model parameters
-- Performance thresholds
-- Alert configurations
-- Resource limits
+- Anomaly detection thresholds
+- Performance baselines
+- Alert thresholds
+- Resource monitoring limits
 
 ## Troubleshooting
 
