@@ -77,4 +77,73 @@ class ProtocolInfo:
         
     def reset(self):
         """Reset all protocol information."""
-        self.__init__()
+        self.protocol_type = None
+        self.protocol_version = None
+        self.features = {}
+        self.capabilities = {}
+        self.security_info = {}
+        self.dialect_info = {}
+        self.connection_info = {}
+        logger.debug("Protocol info reset")
+
+    def analyze_protocols(self, network_data):
+        """Analyze protocol information from network data.
+        
+        Args:
+            network_data (dict): Network metrics data from NetworkMetrics
+            
+        Returns:
+            dict: Protocol analysis results containing:
+                - protocol_distribution: Distribution of protocols used
+                - smb_stats: SMB-specific statistics if available
+                - tcp_stats: TCP connection statistics
+                - error_rates: Protocol-specific error rates
+        """
+        try:
+            # Handle None input
+            if network_data is None:
+                logger.warning("No network data available for protocol analysis")
+                return {
+                    'protocol_distribution': {},
+                    'smb_stats': {},
+                    'tcp_stats': {},
+                    'error_rates': {}
+                }
+                
+            # Initialize results
+            results = {
+                'protocol_distribution': {},
+                'smb_stats': {},
+                'tcp_stats': {},
+                'error_rates': {}
+            }
+            
+            # Analyze TCP stats from network data
+            window_sizes = network_data.get('window_sizes', [])
+            if window_sizes:
+                results['tcp_stats']['avg_window_size'] = sum(window_sizes) / len(window_sizes)
+            else:
+                results['tcp_stats']['avg_window_size'] = 0
+                
+            results['tcp_stats']['retransmission_count'] = network_data.get('retransmissions', 0)
+            
+            # Calculate error rates
+            total_packets = network_data.get('total_packets', 0)
+            if total_packets > 0:
+                packet_loss = network_data.get('packet_loss_count', 0)
+                results['error_rates']['packet_loss_rate'] = packet_loss / total_packets
+                results['error_rates']['retransmission_rate'] = network_data.get('retransmissions', 0) / total_packets
+            else:
+                results['error_rates']['packet_loss_rate'] = 0
+                results['error_rates']['retransmission_rate'] = 0
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error analyzing protocols: {e}")
+            return {
+                'protocol_distribution': {},
+                'smb_stats': {},
+                'tcp_stats': {},
+                'error_rates': {}
+            }

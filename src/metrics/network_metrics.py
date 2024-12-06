@@ -4,10 +4,19 @@ import statistics
 import os
 import threading
 from datetime import datetime, timezone
-from scapy.all import sniff, wrpcap
+import warnings
+
+# Configure scapy to be quiet about warnings
+import logging
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
+from scapy.all import sniff, wrpcap, conf
 from scapy.layers.inet import IP, TCP
 from contextlib import contextmanager
 from ..utils.logging import setup_logger
+
+# Disable scapy warnings
+conf.verb = 0
 
 logger = setup_logger(__name__)
 
@@ -26,47 +35,48 @@ class NetworkMetrics:
         self._capture_thread = None
         self._stop_capture = threading.Event()
         self._capture_file = None
+        self._pcap_dir = None
         
-    @contextmanager
-    def capture_packets(self, interface=None, filter_str=None, timeout=None):
-        """Start packet capture with proper resource cleanup.
+    def set_output_dirs(self, pcap_dir):
+        """Set output directories for captures.
         
         Args:
-            interface (str): Network interface to capture on. None for default.
-            filter_str (str): BPF filter string for capture. None for all packets.
-            timeout (int): Capture timeout in seconds. None for no timeout.
+            pcap_dir (str): Directory to store pcap files
             
-        Yields:
-            bool: True if capture started successfully, False otherwise.
+        Returns:
+            bool: True if directory was set successfully, False otherwise
         """
         try:
-            # Set up capture file
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            self._capture_file = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                'captures',
-                f'capture_{timestamp}.pcap'
-            )
-            os.makedirs(os.path.dirname(self._capture_file), exist_ok=True)
+            if not pcap_dir:
+                logger.error("Invalid pcap directory: directory path is empty")
+                return False
+                
+            logger.debug(f"Setting pcap directory to: {pcap_dir}")
+            self._pcap_dir = pcap_dir
+            os.makedirs(self._pcap_dir, exist_ok=True)
             
-            # Start capture in background thread
-            self._stop_capture.clear()
-            self._capture_thread = threading.Thread(
-                target=self._capture_packets,
-                args=(interface, filter_str, timeout)
-            )
-            self._capture_thread.start()
-            logger.info(f"Started packet capture on {interface or 'default interface'}")
-            
-            yield True
-            
+            # Verify directory exists and is writable
+            if not os.path.exists(self._pcap_dir):
+                logger.error(f"Failed to create pcap directory: {pcap_dir}")
+                return False
+            if not os.access(self._pcap_dir, os.W_OK):
+                logger.error(f"Pcap directory is not writable: {pcap_dir}")
+                return False
+                
+            return True
         except Exception as e:
-            logger.error(f"Failed to start packet capture: {e}")
-            yield False
+            logger.error(f"Error setting pcap directory: {e}")
+            return False
             
-        finally:
-            # Cleanup
+    def cleanup(self):
+        """Clean up resources and stop packet capture."""
+        try:
             self.stop_capture()
+            self.reset()
+            return True
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+            return False
             
     def _capture_packets(self, interface, filter_str, timeout):
         """Background packet capture function."""
@@ -187,3 +197,95 @@ class NetworkMetrics:
     def reset(self):
         """Reset all metrics."""
         self.__init__()
+
+    @contextmanager
+    def capture_packets(self, interface=None, filter_str=None, timeout=None):
+        """Start packet capture with proper resource cleanup.
+        
+        Args:
+            interface (str): Network interface to capture on. None for default.
+            filter_str (str): BPF filter string for capture. None for all packets.
+            timeout (int): Capture timeout in seconds. None for no timeout.
+            
+        Yields:
+            bool: True if capture started successfully, False otherwise.
+        """
+        try:
+            # Verify output directory is set
+            if not self._pcap_dir:
+                raise ValueError("Output directory not set. Cannot start capture.")
+                
+            # Set up capture file in session-specific directory
+            self._capture_file = os.path.join(self._pcap_dir, "capture.pcap")
+            logger.debug(f"Setting up packet capture to file: {self._capture_file}")
+            
+            # Start capture in background thread
+            self._stop_capture.clear()
+            self._capture_thread = threading.Thread(
+                target=self._capture_packets,
+                args=(interface, filter_str, timeout)
+            )
+            self._capture_thread.daemon = True  # Make thread daemon so it exits with main program
+            self._capture_thread.start()
+            logger.info(f"Started packet capture on {interface or 'default interface'}")
+            
+            yield True
+            
+        except Exception as e:
+            logger.error(f"Failed to start packet capture: {e}")
+            yield False
+            
+        finally:
+            # Cleanup
+            self.stop_capture()
+
+    def collect_metrics(self, share_path, duration=60, capture_filter=None):
+        """Collect network metrics for the specified share.
+        
+        Args:
+            share_path (str): Path to the network share
+            duration (int): Duration in seconds to capture traffic
+            capture_filter (str, optional): Custom Wireshark capture filter
+            
+        Returns:
+            dict: Collected network metrics
+        """
+        try:
+            # Reset metrics before starting new collection
+            self.reset()
+            
+            # Verify output directory is set
+            if not self._pcap_dir:
+                logger.error("Output directory not set. Cannot start capture.")
+                return None
+                
+            # Set up capture filter for the share
+            if not capture_filter:
+                # Get IP address from share path
+                share_parts = share_path.strip('\\').split('\\')
+                if share_parts:
+                    host = share_parts[0]
+                    try:
+                        import socket
+                        ip = socket.gethostbyname(host)
+                        capture_filter = f"host {ip}"
+                    except Exception as e:
+                        logger.warning(f"Could not resolve host {host}: {e}")
+                        capture_filter = None
+            
+            # Start packet capture
+            with self.capture_packets(filter_str=capture_filter, timeout=duration) as success:
+                if not success:
+                    logger.error("Failed to start packet capture")
+                    return None
+                    
+                # Wait for capture to complete
+                import time
+                time.sleep(duration)
+            
+            # Return collected statistics
+            return self.get_statistics()
+            
+        except Exception as e:
+            logger.error(f"Error collecting metrics: {e}")
+            return None

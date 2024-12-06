@@ -24,13 +24,14 @@ def get_log_level() -> int:
     debug_level = os.getenv("DEBUG_LEVEL", "2")
     return LOG_LEVEL_MAP.get(debug_level, logging.INFO)
 
-def setup_logger(name: str, log_file: Optional[str] = None) -> logging.Logger:
+def setup_logger(name: str, log_file: Optional[str] = None, console_output: bool = False) -> logging.Logger:
     """
     Set up a logger with consistent formatting and level.
     
     Args:
         name: Name of the logger (typically __name__)
         log_file: Optional specific log file path
+        console_output: Whether to also output to console (default: False)
     
     Returns:
         Configured logger instance
@@ -49,10 +50,11 @@ def setup_logger(name: str, log_file: Optional[str] = None) -> logging.Logger:
         datefmt=ISO_TIMESTAMP_FORMAT
     )
     
-    # Always add console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Add console handler if requested
+    if console_output:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
     
     # Add file handler if specified or use default log file
     if log_file is None:

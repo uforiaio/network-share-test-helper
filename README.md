@@ -156,3 +156,16 @@ dfs-nfs-debugger/
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## New Environment Variable
+
+- `MACHINE_LEARNING`: Set to `ON` to enable machine learning features
+
+## New Features
+
+- Real-time network packet capture and analysis
+- Protocol-specific metrics and insights
+- Performance optimization recommendations
+- Issue detection and troubleshooting
+- Session-based output organization
+- Secure credential handling

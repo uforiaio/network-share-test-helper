@@ -11,6 +11,10 @@ from collections import defaultdict
 import platform
 import requests
 import logging
+import warnings
+
+# Suppress scapy warnings
+warnings.filterwarnings('ignore', message='Wireshark is installed, but cannot read manuf !')
 
 from ..metrics.network_metrics import NetworkMetrics
 from ..metrics.protocol_info import ProtocolInfo
@@ -26,34 +30,56 @@ class ShareAnalyzer:
     
     def __init__(self, share_path, username, debug_level=0, domain=None, openai_key=None):
         """Initialize the ShareAnalyzer."""
+        # Basic setup
         self.share_path = share_path
-        # Convert synology to synology-01 in share path if needed
-        if '\\\\synology\\' in self.share_path:
-            self.share_path = self.share_path.replace('\\\\synology\\', '\\\\synology-01\\')
         self.username = username
         self.domain = domain
         self.debug_level = debug_level
         self.openai_key = openai_key
+        
+        # Convert synology to synology-01 in share path if needed
+        if '\\\\synology\\' in self.share_path:
+            self.share_path = self.share_path.replace('\\\\synology\\', '\\\\synology-01\\')
+            logger.info(f"Converted share path to: {self.share_path}")
+            
+        # Get platform info and setup Wireshark
         self.platform_info = self._get_platform_info()
+        self.wireshark_path = self._find_wireshark_path()
+        if self.wireshark_path:
+            os.environ["WIRESHARK_PATH"] = self.wireshark_path
+            os.environ["PATH"] = f"{self.wireshark_path};{os.environ.get('PATH', '')}"
+        else:
+            logger.warning("Wireshark installation not found")
+            
+        # Setup directories first
+        if not self._setup_directories():
+            logger.error("Failed to set up output directories")
+            raise RuntimeError("Failed to set up output directories")
+        self._setup_logging()
         
-        # Set Wireshark paths
-        self.wireshark_path = r"C:\Program Files\Wireshark"
-        os.environ["WIRESHARK_PATH"] = self.wireshark_path
-        os.environ["PATH"] = f"{self.wireshark_path};{os.environ.get('PATH', '')}"
+        # Initialize components with proper paths
+        self.metrics = NetworkMetrics()
+        if not self.metrics.set_output_dirs(self.pcap_dir):
+            logger.error("Failed to set network metrics output directory")
+            raise RuntimeError("Failed to set network metrics output directory")
         
-        # Download manuf file if missing
-        self._ensure_manuf_file()
+        # Initialize remaining components
+        self.protocol_info = ProtocolInfo()
+        self.issue_detector = IssueDetector()
+        self.performance_optimizer = PerformanceOptimizer()
         
+        # Initialize ML analyzer if enabled
+        self.ml_analyzer = None
+        ml_enabled = os.getenv('MACHINE_LEARNING', 'OFF').upper() == 'ON'
+        if ml_enabled and self.openai_key:
+            try:
+                self.ml_analyzer = MLAnalyzer(self.openai_key)
+            except Exception as e:
+                logger.warning(f"Failed to initialize ML analyzer: {e}")
+                
         # Initialize state
         self._init_state()
         
-        # Initialize components
-        self._init_components()
-        
-        # Set up directories and logging
-        self._setup_directories()
-        self._setup_logging()
-
     def _get_platform_info(self):
         """Get platform-specific information and commands."""
         platform_info = {}
@@ -71,21 +97,97 @@ class ShareAnalyzer:
                 
         return platform_info
 
+    def _find_wireshark_path(self):
+        """Find Wireshark installation path."""
+        common_paths = [
+            r"C:\Program Files\Wireshark",
+            r"C:\Program Files (x86)\Wireshark",
+        ]
+        
+        # First check if WIRESHARK_PATH is already set
+        if "WIRESHARK_PATH" in os.environ:
+            return os.environ["WIRESHARK_PATH"]
+            
+        # Then check common install locations
+        for path in common_paths:
+            if os.path.exists(path):
+                return path
+                
+        # On Windows, try registry
+        if platform.system() == 'Windows':
+            try:
+                import winreg
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WiresharkGroup") as key:
+                    return winreg.QueryValueEx(key, "InstallDir")[0]
+            except Exception:
+                pass
+                
+        return None
+
     def _ensure_manuf_file(self):
         """Ensure Wireshark manufacturer database exists."""
-        manuf_path = os.path.join(self.wireshark_path, 'manuf')
-        if not os.path.exists(manuf_path):
+        # First check resources directory
+        resource_manuf = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources', 'manuf')
+        wireshark_manuf = os.path.join(self.wireshark_path, 'manuf') if self.wireshark_path else None
+        
+        # Use resource manuf if it exists, otherwise fall back to wireshark path
+        manuf_path = resource_manuf if os.path.exists(resource_manuf) else wireshark_manuf
+        
+        if manuf_path and os.path.exists(manuf_path):
+            # Tell Scapy where to find the manuf file
+            from scapy.config import conf
+            conf.manufdb = manuf_path
+            logger.info(f"Using manuf file at: {manuf_path}")
+            return
+            
+        if not manuf_path or not os.path.exists(manuf_path):
             try:
                 print("Downloading Wireshark manufacturer database...")
                 url = 'https://gitlab.com/wireshark/wireshark/-/raw/master/manuf'
                 response = requests.get(url)
-                if response.status_code == 200:
-                    os.makedirs(os.path.dirname(manuf_path), exist_ok=True)
-                    with open(manuf_path, 'wb') as f:
-                        f.write(response.content)
-                    print("Successfully downloaded manufacturer database")
+                response.raise_for_status()
+                # Always save to resources directory
+                manuf_path = resource_manuf
+                os.makedirs(os.path.dirname(manuf_path), exist_ok=True)
+                with open(manuf_path, 'wb') as f:
+                    f.write(response.content)
+                # Tell Scapy where to find the manuf file
+                from scapy.config import conf
+                conf.manufdb = manuf_path
+                print("Successfully downloaded manufacturer database")
             except Exception as e:
                 print(f"Warning: Could not download manufacturer database: {e}")
+
+    def run(self):
+        """Run the share analyzer."""
+        try:
+            logger.info("Starting share analysis...")
+            
+            # Get password from environment
+            password = os.getenv('PASSWORD')
+            if not password:
+                logger.error("PASSWORD environment variable not set")
+                return 1
+                
+            # Authenticate first
+            if not self.authenticate(password):
+                logger.error("Authentication failed")
+                return 1
+                
+            # Run the analysis
+            results = self.analyze_share()
+            if not results:
+                logger.error("Analysis failed")
+                return 1
+                
+            # Clean up
+            if not self.cleanup():
+                logger.warning("Cleanup failed")
+                
+            return 0
+        except Exception as e:
+            logger.error(f"Error during analysis: {str(e)}")
+            return 1
 
     def _init_state(self):
         """Initialize capture and connection state."""
@@ -96,33 +198,54 @@ class ShareAnalyzer:
         self._authenticated = False
         self.error_counts = defaultdict(int)
 
-    def _init_components(self):
-        """Initialize analysis components."""
-        self.metrics = NetworkMetrics()
-        self.protocol_info = ProtocolInfo()
-        self.issue_detector = IssueDetector()
-        self.performance_optimizer = PerformanceOptimizer()
-        
-        # Initialize ML analyzer if API key provided
-        self.ml_analyzer = None
-        if self.openai_key:
-            try:
-                self.ml_analyzer = MLAnalyzer(self.openai_key)
-            except Exception as e:
-                logger.warning(f"Failed to initialize ML analyzer: {str(e)}")
-
     def _setup_directories(self):
-        """Set up output and log directories."""
-        self.output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
-        self.logs_dir = os.path.join(self.output_dir, "logs")
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.logs_dir, exist_ok=True)
+        """Set up output and log directories.
         
-        # Set up log files with ISO 8601 timestamp
-        timestamp_utc = datetime.now(timezone.utc)
-        filename_timestamp = timestamp_utc.strftime("%Y-%m-%dT%H-%M-%S")
-        self.output_file = os.path.join(self.output_dir, f"analysis_{filename_timestamp}.log")
-        self.debug_log = os.path.join(self.logs_dir, f"debug_analysis_{filename_timestamp}.log")
+        Returns:
+            bool: True if directories were set up successfully, False otherwise
+        """
+        try:
+            # Get base output directory
+            self.output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "output")
+            
+            # Create timestamp and session ID (simpler format)
+            timestamp_utc = datetime.now()
+            session_id = os.urandom(4).hex()  # Generate a random 8-character session ID
+            
+            # Format: YYYY-MM-DD-HH.MM.SS-session-id
+            dir_timestamp = f"{timestamp_utc.strftime('%Y-%m-%d-%H.%M.%S')}-{session_id}"
+            
+            # Create session-specific directory
+            self.session_dir = os.path.join(self.output_dir, dir_timestamp)
+            os.makedirs(self.session_dir, exist_ok=True)
+            
+            # Create subdirectories for different types of output
+            self.logs_dir = os.path.join(self.session_dir, "logs")
+            self.pcap_dir = os.path.join(self.session_dir, "pcap")
+            self.json_dir = os.path.join(self.session_dir, "json")
+            
+            # Create all directories
+            for dir_path in [self.logs_dir, self.pcap_dir, self.json_dir]:
+                os.makedirs(dir_path, exist_ok=True)
+                if not os.path.exists(dir_path):
+                    logger.error(f"Failed to create directory: {dir_path}")
+                    return False
+                if not os.access(dir_path, os.W_OK):
+                    logger.error(f"Directory not writable: {dir_path}")
+                    return False
+            
+            # Set up file paths for this session
+            self.session_log = os.path.join(self.logs_dir, "session.log")
+            self.debug_log = os.path.join(self.logs_dir, "debug.log")
+            self.metrics_json = os.path.join(self.json_dir, "metrics.json")
+            self.pcap_file = os.path.join(self.pcap_dir, "capture.pcap")
+            
+            logger.info(f"Created session directory: {self.session_dir}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error setting up directories: {e}")
+            return False
 
     def _setup_logging(self):
         """Set up component-specific logging configuration."""
@@ -146,6 +269,22 @@ class ShareAnalyzer:
         logger.info(f"Platform info: {self.platform_info}")
         logger.info(f"Debug level: {self.debug_level}")
 
+    def _disconnect_all(self):
+        """Disconnect all network connections."""
+        try:
+            # First try to disconnect specific share
+            disconnect_cmd = ['net', 'use', self.share_path.rstrip('\\'), '/delete']
+            subprocess.run(disconnect_cmd, capture_output=True, text=True)
+        except Exception:
+            pass
+            
+        try:
+            # Then try to disconnect all connections
+            disconnect_all_cmd = ['net', 'use', '*', '/delete', '/y']
+            subprocess.run(disconnect_all_cmd, capture_output=True, text=True)
+        except Exception:
+            pass
+            
     def authenticate(self, password=None):
         """Authenticate and connect to the network share.
         
@@ -163,21 +302,35 @@ class ShareAnalyzer:
             if not password:
                 password = getpass.getpass(f"Enter password for {self.username}: ")
             
-            # Format connection command
-            connect_cmd = self.platform_info['connect_cmd'].format(
-                share_path=self.share_path,
-                username=self.username,
-                password=password,
-                domain=self.domain or '.'
-            )
+            # Ensure share path has correct format
+            share_path = self.share_path.rstrip('\\')  # Remove trailing backslash
+            logger.debug(f"Using share path: {share_path}")
+            
+            # First disconnect any existing connections
+            self._disconnect_all()
+            
+            # Format connection command with proper escaping
+            if self.platform_info['is_windows']:
+                # For Windows, use a list to handle special characters properly
+                connect_cmd = ['net', 'use', share_path, '/user:' + self.username, password]
+                logger.debug(f"Using Windows connection command format: net use [share_path] /user:[username] [password]")
+            else:
+                # For Unix, escape special characters in password
+                escaped_password = password.replace('"', '\\"').replace("'", "\\'")
+                connect_cmd = self.platform_info['connect_cmd'].format(
+                    share_path=share_path,
+                    username=self.username,
+                    password=escaped_password,
+                    domain=self.domain or '.'
+                )
+            
+            logger.info(f"Attempting to connect to {share_path}")
             
             # Execute connection command
-            result = subprocess.run(
-                connect_cmd,
-                shell=True,
-                capture_output=True,
-                text=True
-            )
+            if self.platform_info['is_windows']:
+                result = subprocess.run(connect_cmd, capture_output=True, text=True)
+            else:
+                result = subprocess.run(connect_cmd, shell=True, capture_output=True, text=True)
             
             if result.returncode == 0:
                 self._authenticated = True
@@ -186,6 +339,8 @@ class ShareAnalyzer:
                 return True
             else:
                 logger.error(f"Authentication failed: {result.stderr}")
+                if result.stdout:
+                    logger.error(f"Command output: {result.stdout}")
                 return False
                 
         except Exception as e:
@@ -287,49 +442,37 @@ class ShareAnalyzer:
         """
         success = True
         
+        # Disconnect from share
         try:
-            # Stop any ongoing capture
-            if self.is_capturing:
-                logger.info("Stopping network capture...")
-                self.is_capturing = False
-            
-            # Disconnect from share if connected
             if self._connected_share:
                 logger.info("Disconnecting from share...")
-                try:
-                    disconnect_cmd = self.platform_info['disconnect_cmd'].format(
-                        share_path=self.share_path
-                    )
-                    result = subprocess.run(
-                        disconnect_cmd,
-                        shell=True,
-                        capture_output=True,
-                        text=True
-                    )
-                    if result.returncode == 0:
-                        self._connected_share = False
-                        self._authenticated = False
-                    else:
-                        logger.error(f"Failed to disconnect: {result.stderr}")
+                if self.platform_info['is_windows']:
+                    cmd = ['net', 'use', self.share_path.rstrip('\\'), '/delete']
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        logger.error(f"Failed to disconnect: {result.stderr.strip()}")
                         success = False
-                except Exception as e:
-                    logger.error(f"Error disconnecting from share: {str(e)}")
-                    success = False
-            
-            # Clean up components
-            try:
-                self.metrics.cleanup()
-                self.protocol_info.cleanup()
-                self.issue_detector.cleanup()
-                self.performance_optimizer.cleanup()
-                if self.ml_analyzer:
-                    self.ml_analyzer.cleanup()
-            except Exception as e:
-                logger.error(f"Error cleaning up components: {str(e)}")
-                success = False
-                
-            return success
-            
+                else:
+                    # Unix disconnect command
+                    pass  # TODO: Implement Unix disconnect
         except Exception as e:
-            logger.error(f"Cleanup failed: {str(e)}")
-            return False
+            logger.error(f"Error disconnecting from share: {e}")
+            success = False
+            
+        # Clean up components
+        try:
+            if hasattr(self, 'metrics'):
+                self.metrics.cleanup()
+            if hasattr(self, 'protocol_info'):
+                self.protocol_info.reset()
+            if hasattr(self, 'issue_detector'):
+                self.issue_detector.reset()
+            if hasattr(self, 'performance_optimizer'):
+                self.performance_optimizer.reset()
+            if hasattr(self, 'ml_analyzer') and self.ml_analyzer:
+                self.ml_analyzer.cleanup()
+        except Exception as e:
+            logger.error(f"Error cleaning up components: {e}")
+            success = False
+            
+        return success

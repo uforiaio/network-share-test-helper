@@ -91,3 +91,71 @@
    - Documented recent fixes
    - Added error handling notes
    - Updated API documentation
+
+## Latest Changes and Development Notes
+
+## Recent Updates
+
+### Environment Variables
+- Added `MACHINE_LEARNING` toggle (ON/OFF) for ML features
+- Updated environment variable handling in ShareAnalyzer
+
+### Component Updates
+
+#### ShareAnalyzer
+- Improved directory naming format: `YYYY-MM-DD-HH.MM.SS-session-id`
+- Enhanced cleanup process
+- Added ML feature toggle support
+- Fixed share disconnection issues
+
+#### NetworkMetrics
+- Added cleanup method
+- Improved output directory handling
+- Enhanced error logging
+
+#### ProtocolInfo
+- Added reset functionality
+- Improved protocol analysis
+- Enhanced error handling
+
+#### IssueDetector
+- Added reset method
+- Improved issue detection
+- Enhanced error handling
+
+#### PerformanceOptimizer
+- Added reset functionality
+- Improved recommendations
+- Enhanced error handling
+
+#### MLAnalyzer
+- Now optional based on MACHINE_LEARNING setting
+- Improved error handling
+- Enhanced analysis capabilities
+
+## Current Status
+
+### Working Features
+- Network packet capture
+- Protocol analysis
+- Performance optimization
+- Issue detection
+- Session-based output
+- ML analysis (when enabled)
+
+### Known Issues
+- None currently reported
+
+## Next Steps
+
+1. Continue testing network capture
+2. Monitor ML feature performance
+3. Gather user feedback
+4. Implement additional protocol support
+
+## Notes
+
+- ML features are now opt-in
+- Session directories use simplified naming
+- All components have proper cleanup methods
+- Error handling has been improved

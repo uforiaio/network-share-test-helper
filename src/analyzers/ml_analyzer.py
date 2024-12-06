@@ -30,28 +30,117 @@ class MLAnalyzer:
         
         Args:
             network_data (dict): Network metrics data
-            protocol_data (dict): Protocol information
+            protocol_data (dict): Protocol analysis data
             issues (list): Detected issues
             
         Returns:
-            dict: Analysis results including anomalies and predictions
+            dict: ML analysis results
         """
         try:
-            # Basic anomaly detection
-            anomalies = self._basic_anomaly_detection(network_data)
+            # Skip analysis if no data
+            if not network_data or not protocol_data:
+                logger.warning("No data available for ML analysis")
+                return {
+                    'anomalies': [],
+                    'predictions': [],
+                    'recommendations': []
+                }
+                
+            results = {}
             
-            # Performance prediction
-            predictions = self.predict_performance(network_data)
+            # Get current performance stats
+            current_stats = self._get_current_stats(network_data, protocol_data)
             
-            return {
-                'anomalies': anomalies,
-                'predictions': predictions,
-                'timestamp': datetime.now().isoformat()
-            }
+            # Run basic anomaly detection
+            results['anomalies'] = self._detect_anomalies(current_stats)
+            
+            # Make performance predictions
+            results['predictions'] = self._predict_performance(current_stats)
+            
+            return results
             
         except Exception as e:
-            logger.error(f"ML analysis failed: {str(e)}")
-            return None
+            logger.error(f"ML analysis failed: {e}")
+            return {
+                'anomalies': [],
+                'predictions': [],
+                'recommendations': []
+            }
+            
+    def _get_current_stats(self, network_data, protocol_data):
+        """Extract relevant statistics for ML analysis.
+        
+        Args:
+            network_data (dict): Network metrics data
+            protocol_data (dict): Protocol analysis data
+            
+        Returns:
+            dict: Current performance statistics
+        """
+        stats = {}
+        
+        # Extract network metrics
+        stats['packet_loss'] = protocol_data.get('error_rates', {}).get('packet_loss_rate', 0)
+        stats['retransmission_rate'] = protocol_data.get('error_rates', {}).get('retransmission_rate', 0)
+        stats['avg_window_size'] = protocol_data.get('tcp_stats', {}).get('avg_window_size', 0)
+        
+        # Add packet statistics
+        if network_data:
+            stats['total_packets'] = network_data.get('total_packets', 0)
+            stats['avg_packet_size'] = sum(network_data.get('packet_sizes', [])) / len(network_data.get('packet_sizes', [1])) if network_data.get('packet_sizes') else 0
+            
+        return stats
+        
+    def _detect_anomalies(self, stats):
+        """Detect anomalies in current performance stats.
+        
+        Args:
+            stats (dict): Current performance statistics
+            
+        Returns:
+            list: Detected anomalies
+        """
+        anomalies = []
+        
+        # Check for unusual packet loss
+        if stats.get('packet_loss', 0) > 0.1:  # More than 10% loss
+            anomalies.append({
+                'type': 'high_packet_loss',
+                'severity': 'high',
+                'value': stats['packet_loss']
+            })
+            
+        # Check for unusual window size
+        if stats.get('avg_window_size', 0) < 4096:  # Less than 4KB
+            anomalies.append({
+                'type': 'small_window_size',
+                'severity': 'medium',
+                'value': stats['avg_window_size']
+            })
+            
+        return anomalies
+        
+    def _predict_performance(self, stats):
+        """Make performance predictions based on current stats.
+        
+        Args:
+            stats (dict): Current performance statistics
+            
+        Returns:
+            list: Performance predictions
+        """
+        predictions = []
+        
+        # Predict potential throughput issues
+        if stats.get('packet_loss', 0) > 0.05 and stats.get('avg_window_size', 0) < 8192:
+            predictions.append({
+                'type': 'throughput_degradation',
+                'probability': 'high',
+                'impact': 'significant',
+                'reason': 'High packet loss combined with small window size'
+            })
+            
+        return predictions
             
     def _basic_anomaly_detection(self, metrics):
         """Perform basic anomaly detection without OpenAI API.
@@ -149,7 +238,7 @@ class MLAnalyzer:
         """
         try:
             # Get current stats
-            current_stats = self._get_current_stats(metrics)
+            current_stats = self._get_current_stats(metrics, {})
             
             # Filter recent data
             self._filter_recent_data(timeframe_minutes)
@@ -178,3 +267,15 @@ class MLAnalyzer:
             self.isolation_forest = None
         except Exception as e:
             logger.error(f"ML analyzer cleanup failed: {str(e)}")
+            
+    def _filter_recent_data(self, timeframe_minutes):
+        # TO DO: implement filtering of recent data
+        pass
+        
+    def _calculate_trends(self):
+        # TO DO: implement trend calculation
+        return []
+        
+    def _generate_ai_prediction(self):
+        # TO DO: implement AI prediction generation
+        return None

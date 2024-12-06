@@ -9,12 +9,14 @@ Create a `.env` file based on `env.template`:
 SHARE_PATH=\\server\share
 USERNAME=your_username
 DOMAIN=your_domain        # Optional domain name
+PASSWORD=your_password    # Password for share access
 
 # Debug Settings
 DEBUG_LEVEL=1  # 0=Basic, 1=Standard, 2=Detailed, 3=Full
 
 # API Keys
 OPENAI_KEY=your_openai_key  # Optional for ML features
+MACHINE_LEARNING=OFF       # Enable/disable ML features (ON/OFF)
 
 # Output Settings
 OUTPUT_DIR=output
