@@ -82,6 +82,7 @@ docs/_build/
 docs/_static/
 docs/_templates/
 RESOURCE_MANAGEMENT.md
+temp.md
 
 # OS
 .DS_Store
