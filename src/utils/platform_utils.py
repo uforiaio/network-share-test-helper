@@ -1,14 +1,30 @@
-"""Platform-specific utilities and information gathering."""
+"""Platform utilities facade module.
+
+This module serves as a facade for platform-specific utilities and information gathering,
+re-exporting functionality from specialized modules.
+"""
 
 import os
-import sys
-import platform
 import socket
-import winreg
+import platform
 import psutil
+import winreg
 from typing import Dict, Any
 from .logging import setup_logger
+from .system_info import get_system_info, get_performance_metrics
+from .network_utils import get_network_interfaces, get_dns_servers
+from .windows_utils import get_windows_info, get_network_shares
 
+__all__ = [
+    'get_system_info',
+    'get_performance_metrics',
+    'get_network_interfaces',
+    'get_dns_servers',
+    'get_windows_info',
+    'get_network_shares'
+]
+
+# Initialize logger for any facade-level logging
 logger = setup_logger(__name__)
 
 def get_platform_info() -> Dict[str, Any]:
