@@ -1,4 +1,4 @@
-# DFS/NFS Share Analyzer
+# DFS/NFS Share Analyzer /* Do not use, too many bugs. Fixed it well enough to fix a problem with DFS. It's on my todo list. :)
 
 A powerful command-line utility for analyzing DFS and NFS shares, combining traditional network analysis with advanced machine learning capabilities for comprehensive debugging and performance optimization.
 
