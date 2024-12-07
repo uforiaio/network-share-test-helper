@@ -5,6 +5,7 @@ import os
 import threading
 from datetime import datetime, timezone
 import warnings
+import subprocess
 
 # Configure scapy to be quiet about warnings
 import logging
@@ -63,6 +64,11 @@ class NetworkMetrics:
                 logger.error(f"Pcap directory is not writable: {pcap_dir}")
                 return False
                 
+            # Set capture file path
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            self._capture_file = os.path.join(self._pcap_dir, f'capture_{timestamp}.pcap')
+            logger.debug(f"Set capture file path to: {self._capture_file}")
+                
             return True
         except Exception as e:
             logger.error(f"Error setting pcap directory: {e}")
@@ -81,16 +87,64 @@ class NetworkMetrics:
     def _capture_packets(self, interface, filter_str, timeout):
         """Background packet capture function."""
         try:
-            self._capture = sniff(
-                iface=interface,
-                filter=filter_str,
-                timeout=timeout,
-                stop_filter=lambda _: self._stop_capture.is_set(),
-                prn=self._process_packet,
-                store=False
+            # Get tshark path
+            tshark_path = os.getenv('TSHARK_PATH', 'C:\\Program Files\\Wireshark\\tshark.exe')
+            
+            if not os.path.exists(tshark_path):
+                raise RuntimeError(f"tshark not found at {tshark_path}")
+            
+            # Create output directory
+            os.makedirs(os.path.dirname(self._capture_file), exist_ok=True)
+            
+            # Basic tshark command - simplified for reliability
+            args = [
+                tshark_path,
+                '-i', '1',                    # Interface
+                '-w', self._capture_file,     # Output file
+                '-f', 'port 445 or port 139'  # SMB traffic
+            ]
+            
+            logger.info(f"Starting tshark with command: {' '.join(args)}")
+            
+            # Run tshark directly
+            process = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
             )
+            
+            self._capture = process
+            
+            # Check if process started successfully
+            import time
+            time.sleep(1)  # Give it a moment to start
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+                error_msg = stderr.decode('utf-8') if stderr else stdout.decode('utf-8')
+                raise RuntimeError(f"tshark failed to start: {error_msg}")
+            
+            logger.info(f"tshark started with PID {process.pid}")
+            
+            # Wait for timeout
+            time.sleep(timeout)
+            
+            # Stop capture
+            logger.info("Stopping tshark capture...")
+            if process.poll() is None:  # If still running
+                process.terminate()
+                process.wait(timeout=5)  # Wait up to 5 seconds
+                
+            if process.returncode and process.returncode != 0:
+                stdout, stderr = process.communicate()
+                error_msg = stderr.decode('utf-8') if stderr else stdout.decode('utf-8')
+                raise RuntimeError(f"tshark exited with code {process.returncode}: {error_msg}")
+                
+            logger.info("Packet capture completed successfully")
+            
         except Exception as e:
             logger.error(f"Error during packet capture: {e}")
+            raise
             
     def _process_packet(self, packet):
         """Process a captured packet."""
@@ -126,7 +180,7 @@ class NetworkMetrics:
             
             if self._capture_file and self._capture:
                 try:
-                    wrpcap(self._capture_file, self._capture)
+                    # wrpcap(self._capture_file, self._capture)
                     logger.info(f"Saved capture to {self._capture_file}")
                 except Exception as e:
                     logger.error(f"Failed to save capture file: {e}")
@@ -195,8 +249,25 @@ class NetworkMetrics:
         return stats
         
     def reset(self):
-        """Reset all metrics."""
-        self.__init__()
+        """Reset all metrics but preserve output directory settings."""
+        # Store output settings
+        pcap_dir = self._pcap_dir
+        capture_file = self._capture_file
+        
+        # Reset everything
+        self.rtt_samples = []
+        self.packet_sizes = []
+        self.retransmissions = 0
+        self.window_sizes = []
+        self.packet_loss_count = 0
+        self.total_packets = 0
+        self._capture = None
+        self._capture_thread = None
+        self._stop_capture = threading.Event()
+        
+        # Restore output settings
+        self._pcap_dir = pcap_dir
+        self._capture_file = capture_file
 
     @contextmanager
     def capture_packets(self, interface=None, filter_str=None, timeout=None):
@@ -216,7 +287,8 @@ class NetworkMetrics:
                 raise ValueError("Output directory not set. Cannot start capture.")
                 
             # Set up capture file in session-specific directory
-            self._capture_file = os.path.join(self._pcap_dir, "capture.pcap")
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            self._capture_file = os.path.join(self._pcap_dir, f'capture_{timestamp}.pcap')
             logger.debug(f"Setting up packet capture to file: {self._capture_file}")
             
             # Start capture in background thread

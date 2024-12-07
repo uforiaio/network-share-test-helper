@@ -1,4 +1,13 @@
 # Resource Management Guidelines
+*Last Updated: 2024-12-06*
+
+## Table of Contents
+1. [Context Management](#context-management)
+2. [Code Management](#code-management)
+3. [Testing Guidelines](#testing-guidelines)
+4. [Documentation](#documentation)
+5. [Resource Types](#resource-types)
+6. [Best Practices](#best-practices)
 
 ## Context Management
 

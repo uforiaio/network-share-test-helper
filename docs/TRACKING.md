@@ -1,4 +1,17 @@
 # Development Tracking
+*Last Updated: 2024-12-06*
+
+## Table of Contents
+1. [Version History](#version-history)
+2. [Planned Features](#planned-features)
+3. [Issue Tracking](#issue-tracking)
+4. [Current Features](#current-features)
+5. [Known Issues](#known-issues)
+6. [Future Enhancements](#future-enhancements)
+7. [Contributing](#contributing)
+8. [Best Practices](#best-practices)
+9. [Version Control](#version-control)
+10. [Maintenance](#maintenance)
 
 ## Version History
 

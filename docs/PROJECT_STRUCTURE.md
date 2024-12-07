@@ -1,4 +1,12 @@
 # Project Structure
+*Last Updated: 2024-12-06*
+
+## Table of Contents
+1. [Directory Layout](#directory-layout)
+2. [Core Components](#core-components)
+3. [Module Organization](#module-organization)
+4. [Test Structure](#test-structure)
+5. [Documentation](#documentation)
 
 ## Directory Layout
 

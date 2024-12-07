@@ -1,4 +1,11 @@
-# Dependencies
+# Project Dependencies
+*Last Updated: 2024-12-06*
+
+## Table of Contents
+1. [Core Dependencies](#core-dependencies)
+2. [Optional Dependencies](#optional-dependencies)
+3. [Development Dependencies](#development-dependencies)
+4. [Version Requirements](#version-requirements)
 
 ## Core Dependencies
 

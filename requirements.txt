@@ -9,6 +9,8 @@ scapy>=2.5.0
 pyshark>=0.6.0
 netifaces>=0.11.0
 psutil>=5.9.6
+# Note: tcpdump/WinDump is required for packet capture
+#       Run scripts/install_windump.ps1 to install WinDump on Windows
 
 # Data processing and ML
 pandas>=2.1.3

@@ -1,4 +1,11 @@
 # Configuration Guide
+*Last Updated: 2024-12-06*
+
+## Table of Contents
+1. [Environment Setup](#environment-setup)
+2. [Share Configuration](#share-configuration)
+3. [Network Settings](#network-settings)
+4. [Logging Configuration](#logging-configuration)
 
 ## Environment Setup
 

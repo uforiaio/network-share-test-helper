@@ -36,9 +36,17 @@ def main():
     username = os.getenv('USERNAME')
     domain = os.getenv('DOMAIN')
     password = os.getenv('PASSWORD')
-    debug_level_str = os.getenv('DEBUG_LEVEL', '2')
-    debug_level = int(debug_level_str.split('#')[0].strip())  # Handle comments in env var
+    debug_level_str = os.getenv('DEBUG_LEVEL', 'INFO').upper().strip()
     openai_key = os.getenv('OPENAI_KEY')
+    
+    # Convert debug level string to integer
+    debug_level_map = {
+        'DEBUG': 3,
+        'INFO': 2,
+        'WARNING': 1,
+        'ERROR': 0
+    }
+    debug_level = debug_level_map.get(debug_level_str, 2)  # Default to INFO level
     
     # Debug log environment variables
     logger.debug(f"Environment variables loaded:")

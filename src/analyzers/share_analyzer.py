@@ -48,6 +48,7 @@ class ShareAnalyzer:
         if self.wireshark_path:
             os.environ["WIRESHARK_PATH"] = self.wireshark_path
             os.environ["PATH"] = f"{self.wireshark_path};{os.environ.get('PATH', '')}"
+            self._ensure_manuf_file()
         else:
             logger.warning("Wireshark installation not found")
             
@@ -205,8 +206,9 @@ class ShareAnalyzer:
             bool: True if directories were set up successfully, False otherwise
         """
         try:
-            # Get base output directory
-            self.output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "output")
+            # Get base output directory from environment or use default
+            base_output_dir = os.getenv('OUTPUT_DIR', 'output')
+            self.output_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), base_output_dir))
             
             # Create timestamp and session ID (simpler format)
             timestamp_utc = datetime.now()
@@ -224,9 +226,11 @@ class ShareAnalyzer:
             self.pcap_dir = os.path.join(self.session_dir, "pcap")
             self.json_dir = os.path.join(self.session_dir, "json")
             
-            # Create all directories
+            # Create all directories with full permissions
             for dir_path in [self.logs_dir, self.pcap_dir, self.json_dir]:
                 os.makedirs(dir_path, exist_ok=True)
+                # Set directory permissions to allow full access
+                os.chmod(dir_path, 0o777)
                 if not os.path.exists(dir_path):
                     logger.error(f"Failed to create directory: {dir_path}")
                     return False
@@ -365,6 +369,11 @@ class ShareAnalyzer:
             # Start network capture
             logger.info(f"Starting network capture for {duration} seconds...")
             self.is_capturing = True
+            
+            # Ensure pcap directory is set
+            if not self.metrics.set_output_dirs(self.pcap_dir):
+                logger.error("Failed to set network metrics output directory")
+                return None
             
             # Collect network metrics
             network_data = self.metrics.collect_metrics(

@@ -1,4 +1,12 @@
-# User Guide
+# DFS/NFS Debugger User Guide
+*Last Updated: 2024-12-06*
+
+## Table of Contents
+1. [Quick Start](#quick-start)
+2. [Features](#features)
+3. [Output Files](#output-files)
+4. [Debug Levels](#debug-levels)
+5. [Best Practices](#best-practices)
 
 ## Quick Start
 

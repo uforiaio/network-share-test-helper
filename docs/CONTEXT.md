@@ -1,6 +1,14 @@
-# Project Context
+# DFS/NFS Debugger Context
+*Last Updated: 2024-12-06*
 
-## Overview
+## Table of Contents
+1. [Project Overview](#project-overview)
+2. [Core Features](#core-features)
+3. [Technical Stack](#technical-stack)
+4. [Use Cases](#use-cases)
+5. [Best Practices](#best-practices)
+
+## Project Overview
 The DFS/NFS Debugger is a comprehensive network analysis tool designed to help diagnose and optimize network share performance. It supports both Windows DFS/SMB and Unix NFS protocols, providing detailed metrics and insights about network share behavior.
 
 ## Core Features
